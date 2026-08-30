@@ -22,12 +22,12 @@ impl Film {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
 
-        writer.write_all(format!("P3\n{} {}\n255\n", self.width, self.height).as_bytes())?;
+        writer.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
         for pixel in &self.pixels {
             let data = (pixel * 255.0)
                 .clamp(glam::Vec3::ZERO, glam::Vec3::splat(255.0))
                 .as_u8vec3();
-            writer.write_all(format!("{} {} {}\n", data.x, data.y, data.z).as_bytes())?;
+            writer.write_all(&data.to_array())?;
         }
         writer.flush()?;
 
@@ -39,7 +39,7 @@ impl Film {
     }
 
     pub fn height(&self) -> usize {
-        self.width
+        self.height
     }
 
     pub fn get_pixel(&self, x: usize, y: usize) -> Option<glam::Vec3> {
@@ -51,6 +51,10 @@ impl Film {
         let index = self.coord_to_index(x, y)?;
         self.pixels[index] = color;
         Some(())
+    }
+
+    pub fn as_slice_mut(&mut self) -> &mut [glam::Vec3] {
+        &mut self.pixels
     }
 
     fn coord_to_index(&self, x: usize, y: usize) -> Option<usize> {
