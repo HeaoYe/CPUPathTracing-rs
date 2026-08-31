@@ -5,9 +5,10 @@ pub use normal_integrator::NormalIntegrator;
 pub use simple_rt_integrator::SimpleRTIntegrator;
 
 use crate::{
+    THREAD_POOL,
     camera::{Camera, CameraModel, PixelSample},
     scene::Scene,
-    util::Progress,
+    util::{Progress, profile},
 };
 
 pub trait Integrator {
@@ -31,6 +32,8 @@ pub fn render<T>(
 where
     T: Integrator + Sync,
 {
+    profile!("render {} spp {}", spp, filename.as_ref().display());
+
     let Camera { film, geometry } = camera;
     film.clear();
 
@@ -41,7 +44,7 @@ where
 
     while current_spp < spp {
         let batch_spp = increase.min(spp - current_spp);
-        crate::THREAD_POOL.parallel_for_2d(
+        THREAD_POOL.parallel_for_2d(
             film.width(),
             film.height(),
             film.as_slice_mut(),

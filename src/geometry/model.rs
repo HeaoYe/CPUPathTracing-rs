@@ -1,80 +1,65 @@
 use super::{Intersection, Ray, Shape, Triangle};
+use crate::{
+    accelerate::Bounds,
+    util::{parse_obj, profile},
+};
 
 pub struct Model {
     triangles: Vec<Triangle>,
+    bounds: Bounds,
 }
 
 impl Model {
     pub fn load(filename: impl AsRef<std::path::Path>) -> Result<Self, std::io::Error> {
-        use std::{
-            fs::File,
-            io::{BufRead, BufReader},
-        };
+        profile!("Load model {}", filename.as_ref().display());
 
-        let file = File::open(filename)?;
-        let reader = BufReader::new(file);
+        let parsed_obj = parse_obj(filename)?;
 
-        let mut triangles = Vec::new();
-        let mut positions = Vec::new();
-        let mut normals = Vec::new();
-
-        for line in reader.lines() {
-            let line = line?;
-            let mut tokens = line.split_whitespace();
-
-            let Some(type_) = tokens.next() else {
-                continue;
-            };
-            match type_ {
-                "v" => {
-                    // v 22 12 12
-                    let position = glam::Vec3::new(
-                        tokens.next().unwrap().parse().unwrap(),
-                        tokens.next().unwrap().parse().unwrap(),
-                        tokens.next().unwrap().parse().unwrap(),
-                    );
-                    positions.push(position);
-                }
-                "vn" => {
-                    // vn 22 12 12
-                    let normal = glam::Vec3::new(
-                        tokens.next().unwrap().parse().unwrap(),
-                        tokens.next().unwrap().parse().unwrap(),
-                        tokens.next().unwrap().parse().unwrap(),
-                    );
-                    normals.push(normal);
-                }
-                "f" => {
-                    // f 1//4  2//3  3//2
-                    // T { 0, 1, 2   3, 2, 1}
-                    let mut position_idx = glam::USizeVec3::ZERO;
-                    let mut normal_idx = glam::USizeVec3::ZERO;
-                    for i in 0..3 {
-                        let mut part = tokens.next().unwrap().split("//");
-                        position_idx[i] = part.next().unwrap().parse().unwrap();
-                        normal_idx[i] = part.next().unwrap().parse().unwrap();
-                    }
-                    triangles.push(Triangle {
-                        p0: positions[position_idx[0] - 1],
-                        p1: positions[position_idx[1] - 1],
-                        p2: positions[position_idx[2] - 1],
-                        n0: normals[normal_idx[0] - 1],
-                        n1: normals[normal_idx[1] - 1],
-                        n2: normals[normal_idx[2] - 1],
-                    });
-                }
-                _ => {
-                    continue;
-                }
+        let mut triangles = Vec::with_capacity(parsed_obj.triangles.len());
+        for indices in parsed_obj.triangles {
+            let p0 = parsed_obj.vertices[indices[0].vertex];
+            let p1 = parsed_obj.vertices[indices[1].vertex];
+            let p2 = parsed_obj.vertices[indices[2].vertex];
+            let n0 = parsed_obj.normals[indices[0].normal];
+            let n1 = parsed_obj.normals[indices[1].normal];
+            let n2 = parsed_obj.normals[indices[2].normal];
+            if n0 == glam::Vec3::ZERO || n1 == glam::Vec3::ZERO || n2 == glam::Vec3::ZERO {
+                triangles.push(Triangle::from_points(p0, p1, p2));
+            } else {
+                triangles.push(Triangle {
+                    p0,
+                    p1,
+                    p2,
+                    n0,
+                    n1,
+                    n2,
+                });
             }
         }
 
-        Ok(Self { triangles })
+        let mut model = Self {
+            triangles,
+            bounds: Default::default(),
+        };
+        model.build();
+        Ok(model)
+    }
+
+    fn build(&mut self) {
+        for triangle in &self.triangles {
+            self.bounds.expand_point(triangle.p0);
+            self.bounds.expand_point(triangle.p1);
+            self.bounds.expand_point(triangle.p2);
+        }
     }
 }
 
 impl Shape for Model {
     fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
+        if !self.bounds.has_intersection(ray, t_min, t_max) {
+            return None;
+        }
+
         let mut closest_intersection = None;
         for triangle in &self.triangles {
             if let Some(intersection) = triangle.intersect(ray, t_min, t_max) {
