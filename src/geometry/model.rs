@@ -1,8 +1,4 @@
-use glam::Vec3;
-
-use super::ray::Ray;
-use super::shape::{Intersection, Shape};
-use super::triangle::Triangle;
+use super::{Intersection, Ray, Shape, Triangle};
 
 pub struct Model {
     triangles: Vec<Triangle>,
@@ -32,7 +28,7 @@ impl Model {
             match type_ {
                 "v" => {
                     // v 22 12 12
-                    let position = Vec3::new(
+                    let position = glam::Vec3::new(
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
@@ -41,7 +37,7 @@ impl Model {
                 }
                 "vn" => {
                     // vn 22 12 12
-                    let normal = Vec3::new(
+                    let normal = glam::Vec3::new(
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),

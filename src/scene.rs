@@ -1,6 +1,5 @@
-use super::material::Material;
-use super::ray::Ray;
-use super::shape::{Intersection, Shape};
+use crate::geometry::{Intersection, Ray, Shape};
+use crate::material::Material;
 
 pub struct InstanceTransform {
     pub translation: glam::Vec3,

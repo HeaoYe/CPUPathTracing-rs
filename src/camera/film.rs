@@ -1,4 +1,4 @@
-use super::rgb::RGB;
+use crate::util::RGB;
 
 #[derive(Default, Clone)]
 pub struct Pixel {
@@ -6,14 +6,26 @@ pub struct Pixel {
     sample_count: usize,
 }
 
+pub enum PixelSample {
+    Radiance(glam::Vec3),
+    RGB(crate::util::RGB),
+}
+
 impl Pixel {
-    pub fn add_sample(&mut self, color: glam::Vec3) {
-        self.color_sum += color;
+    pub fn add_sample(&mut self, sample: PixelSample) {
+        match sample {
+            PixelSample::Radiance(radiance) => self.color_sum += radiance,
+            PixelSample::RGB(rgb) => self.color_sum += glam::Vec3::from(rgb),
+        }
         self.sample_count += 1;
     }
 
     pub fn average(&self) -> glam::Vec3 {
-        self.color_sum / self.sample_count as f32
+        if self.sample_count == 0 {
+            glam::Vec3::ZERO
+        } else {
+            self.color_sum / self.sample_count as f32
+        }
     }
 }
 
@@ -28,7 +40,7 @@ impl Film {
         Self {
             width,
             height,
-            pixels: vec![Pixel::default(); width * height],
+            pixels: vec![Default::default(); width * height],
         }
     }
 
@@ -49,6 +61,12 @@ impl Film {
         writer.flush()?;
 
         Ok(())
+    }
+
+    pub fn clear(&mut self) {
+        self.pixels.clear();
+        self.pixels
+            .resize(self.width * self.height, Default::default());
     }
 
     pub fn width(&self) -> usize {
