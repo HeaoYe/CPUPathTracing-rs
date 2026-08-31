@@ -1,8 +1,8 @@
-use super::spin_lock::{SpinLock, SpinLockGuard};
+use super::spin_lock::SpinLock;
 use std::{
     collections::VecDeque,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
@@ -57,18 +57,6 @@ impl ThreadPool {
         }
 
         Self { workers, context }
-    }
-
-    pub fn add_task(&mut self, task: Task) {
-        let mut task_deque = self.context.tasks.lock();
-        self.add_task_private(task, &mut task_deque);
-    }
-
-    fn add_task_private(&self, task: Task, task_deque: &mut SpinLockGuard<'_, VecDeque<Task>>) {
-        task_deque.push_back(task);
-        self.context
-            .pending_task_count
-            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn wait(&self) {
@@ -144,7 +132,7 @@ impl ThreadPool {
             let func = &func;
             for (y, line) in data.chunks_mut(width).enumerate() {
                 let task: Box<dyn FnOnce() + Send + '_> = Box::new(move || {
-                    for (x, value) in line.into_iter().enumerate() {
+                    for (x, value) in line.iter_mut().enumerate() {
                         func(x, y, value);
                     }
                 });
@@ -155,7 +143,10 @@ impl ThreadPool {
                 // note: type Task = Box<dyn FnOnce() + Send + 'static>
                 let task: Box<dyn FnOnce() + Send + 'static> = unsafe { std::mem::transmute(task) };
 
-                self.add_task_private(task, &mut task_deque);
+                task_deque.push_back(task);
+                self.context
+                    .pending_task_count
+                    .fetch_add(1, Ordering::Relaxed);
             }
         }
     }
