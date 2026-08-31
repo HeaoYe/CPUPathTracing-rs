@@ -10,13 +10,13 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**4 / 25 — 球体与相交测试**
+当前进度：**5 / 25 — 模型渲染**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
 - [x] [Lecture03](../../tree/Lecture03) 自旋锁与并行 for 循环
 - [x] [Lecture04](../../tree/Lecture04) 球体与相交测试
-- [ ] Lecture05 模型渲染
+- [x] [Lecture05](../../tree/Lecture05) 模型渲染
 - [ ] Lecture06 平面与场景
 - [ ] Lecture07 材质与极简光追
 - [ ] Lecture08 一些代码重构
@@ -43,6 +43,24 @@
 ### 获取源码
 ```bash
 git clone https://github.com/HeaoYe/CPUPathTracing-rs.git
+```
+
+### 下载资源文件
+- 新建models文件夹
+- 下载[资源文件](https://github.com/HeaoYe/CPUPathTracing/releases)
+- 将.obj模型文件放入models文件夹
+- 文件夹结构预览
+```txt
+ CPUPathTracing-rs
+ ├── models
+ │   └── simple_dragon.obj
+ ├── .vscode/
+ ├── src/
+ ├── .gitignore
+ ├── Cargo.lock
+ ├── Cargo.toml
+ ├── LICENSE
+ └── README.md
 ```
 
 ### 编译
@@ -100,3 +118,6 @@ cargo run --release
 
 ## 许可证 License
 本项目原创源代码基于 [MIT License](LICENSE) 开源。
+
+仓库 Release 中提供的模型、HDRI、光谱数据及其他外部资源
+不包含在 MIT License 的授权范围内。
