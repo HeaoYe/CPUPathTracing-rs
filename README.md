@@ -10,14 +10,14 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**5 / 25 — 模型渲染**
+当前进度：**6 / 25 — 平面与场景**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
 - [x] [Lecture03](../../tree/Lecture03) 自旋锁与并行 for 循环
 - [x] [Lecture04](../../tree/Lecture04) 球体与相交测试
 - [x] [Lecture05](../../tree/Lecture05) 模型渲染
-- [ ] Lecture06 平面与场景
+- [x] [Lecture06](../../tree/Lecture06) 平面与场景
 - [ ] Lecture07 材质与极简光追
 - [ ] Lecture08 一些代码重构
 - [ ] Lecture09 性能优化（上）：并行优化
