@@ -1,3 +1,4 @@
+use super::material::Material;
 use super::ray::Ray;
 use super::shape::{Intersection, Shape};
 
@@ -25,6 +26,7 @@ impl InstanceTransform {
 
 struct ShapeInstance<'a> {
     shape: &'a dyn Shape,
+    material: Material,
     world_from_object: glam::Affine3A,
     object_from_world: glam::Affine3A,
 }
@@ -35,18 +37,29 @@ pub struct Scene<'a> {
 }
 
 impl<'a> Scene<'a> {
-    pub fn add_shape(&mut self, shape: &'a dyn Shape, transform: InstanceTransform) {
+    pub fn add_shape(
+        &mut self,
+        shape: &'a dyn Shape,
+        material: Material,
+        transform: InstanceTransform,
+    ) {
         let world_from_object = transform.into_affine();
         self.instances.push(ShapeInstance {
-            shape: shape,
+            shape,
+            material,
             world_from_object,
             object_from_world: world_from_object.inverse(),
         });
     }
 }
 
-impl Shape for Scene<'_> {
-    fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
+pub struct HitInfo<'a> {
+    pub intersection: Intersection,
+    pub material: &'a Material,
+}
+
+impl Scene<'_> {
+    pub fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<HitInfo<'_>> {
         let mut closest = None;
         for instance in &self.instances {
             let ray_object = ray.transform(instance.object_from_world);
@@ -67,6 +80,9 @@ impl Shape for Scene<'_> {
             .mul_transpose_vec3(closest_intersection.normal)
             .normalize();
 
-        Some(closest_intersection)
+        Some(HitInfo {
+            intersection: closest_intersection,
+            material: &closest_instance.material,
+        })
     }
 }
