@@ -1,4 +1,4 @@
-use super::spin_lock::SpinLock;
+use super::spin_lock::{SpinLock, SpinLockGuard};
 use std::{
     collections::VecDeque,
     sync::{
@@ -33,11 +33,10 @@ pub struct ThreadPool {
 impl ThreadPool {
     pub fn new(mut thread_count: usize) -> Self {
         if thread_count == 0 {
-            thread_count = match thread::available_parallelism() {
-                Ok(count) => count.get(),
-                _ => 1,
-            }
-        };
+            thread_count = thread::available_parallelism()
+                .map(|count| count.get())
+                .unwrap_or(1);
+        }
 
         let context = Arc::new(WorkerContext {
             alive: AtomicBool::new(true),
@@ -57,6 +56,18 @@ impl ThreadPool {
         }
 
         Self { workers, context }
+    }
+
+    pub fn add_task(&self, task: Task) {
+        let mut task_deque = self.context.tasks.lock();
+        self.add_task_private(task, &mut task_deque);
+    }
+
+    pub fn add_task_private(&self, task: Task, task_deque: &mut SpinLockGuard<VecDeque<Task>>) {
+        task_deque.push_back(task);
+        self.context
+            .pending_task_count
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn wait(&self) {
@@ -103,18 +114,21 @@ impl ThreadPool {
     }
 }
 
-struct ScoopWaitGuard<'a> {
-    context: &'a WorkerContext,
+struct ScopeWaitGuard<'a> {
+    scope_counter: &'a AtomicUsize,
 }
 
-impl<'a> Drop for ScoopWaitGuard<'a> {
+impl<'a> Drop for ScopeWaitGuard<'a> {
     fn drop(&mut self) {
-        self.context.wait();
+        while self.scope_counter.load(Ordering::Acquire) != 0 {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+            std::hint::spin_loop();
+        }
     }
 }
 
 impl ThreadPool {
-    pub fn parallel_for_2d<T, F>(&mut self, width: usize, height: usize, data: &mut [T], func: F)
+    pub fn parallel_for_2d<T, F>(&self, width: usize, height: usize, data: &mut [T], func: F)
     where
         T: Send,
         F: Fn(usize, usize, &mut T) + Sync,
@@ -123,15 +137,21 @@ impl ThreadPool {
             return;
         }
 
-        let _guard = ScoopWaitGuard {
-            context: &self.context,
+        let scope_counter = AtomicUsize::new(0);
+
+        let _guard = ScopeWaitGuard {
+            scope_counter: &scope_counter,
         };
 
         {
             let mut task_deque = self.context.tasks.lock();
             let func = &func;
+            let scope_counter = &scope_counter;
             for (y, line) in data.chunks_mut(width).enumerate() {
                 let task: Box<dyn FnOnce() + Send + '_> = Box::new(move || {
+                    let _guard = CompletionGuard {
+                        counter: scope_counter,
+                    };
                     for (x, value) in line.iter_mut().enumerate() {
                         func(x, y, value);
                     }
@@ -142,12 +162,12 @@ impl ThreadPool {
                 // 故可以安全的将生命周期转换为 'static
                 // note: type Task = Box<dyn FnOnce() + Send + 'static>
                 let task: Box<dyn FnOnce() + Send + 'static> = unsafe { std::mem::transmute(task) };
-
-                task_deque.push_back(task);
-                self.context
-                    .pending_task_count
-                    .fetch_add(1, Ordering::Relaxed);
+                self.add_task_private(task, &mut task_deque);
+                scope_counter.fetch_add(1, Ordering::Relaxed);
             }
         }
     }
 }
+
+pub static THREAD_POOL: std::sync::LazyLock<ThreadPool> =
+    std::sync::LazyLock::new(|| ThreadPool::new(0));

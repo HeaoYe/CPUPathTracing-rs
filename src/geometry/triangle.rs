@@ -1,5 +1,4 @@
-use super::ray::Ray;
-use super::shape::{Intersection, Shape};
+use super::{Intersection, Ray, Shape};
 
 pub struct Triangle {
     pub p0: glam::Vec3,

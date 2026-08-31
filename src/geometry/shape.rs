@@ -1,4 +1,4 @@
-use super::ray::Ray;
+use super::Ray;
 
 pub struct Intersection {
     pub t: f32,
