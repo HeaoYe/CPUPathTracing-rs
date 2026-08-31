@@ -1,7 +1,26 @@
+use super::rgb::RGB;
+
+#[derive(Default, Clone)]
+pub struct Pixel {
+    color_sum: glam::Vec3,
+    sample_count: usize,
+}
+
+impl Pixel {
+    pub fn add_sample(&mut self, color: glam::Vec3) {
+        self.color_sum += color;
+        self.sample_count += 1;
+    }
+
+    pub fn average(&self) -> glam::Vec3 {
+        self.color_sum / self.sample_count as f32
+    }
+}
+
 pub struct Film {
     width: usize,
     height: usize,
-    pixels: Vec<glam::Vec3>,
+    pixels: Vec<Pixel>,
 }
 
 impl Film {
@@ -9,7 +28,7 @@ impl Film {
         Self {
             width,
             height,
-            pixels: vec![glam::Vec3::ZERO; width * height],
+            pixels: vec![Pixel::default(); width * height],
         }
     }
 
@@ -24,10 +43,8 @@ impl Film {
 
         writer.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
         for pixel in &self.pixels {
-            let data = (pixel * 255.0)
-                .clamp(glam::Vec3::ZERO, glam::Vec3::splat(255.0))
-                .as_u8vec3();
-            writer.write_all(&data.to_array())?;
+            let rgb = RGB::from(pixel.average());
+            writer.write_all(&rgb.to_array())?;
         }
         writer.flush()?;
 
@@ -42,26 +59,7 @@ impl Film {
         self.height
     }
 
-    pub fn get_pixel(&self, x: usize, y: usize) -> Option<glam::Vec3> {
-        let index = self.coord_to_index(x, y)?;
-        Some(self.pixels[index])
-    }
-
-    pub fn set_pixel(&mut self, x: usize, y: usize, color: glam::Vec3) -> Option<()> {
-        let index = self.coord_to_index(x, y)?;
-        self.pixels[index] = color;
-        Some(())
-    }
-
-    pub fn as_slice_mut(&mut self) -> &mut [glam::Vec3] {
+    pub fn as_slice_mut(&mut self) -> &mut [Pixel] {
         &mut self.pixels
-    }
-
-    fn coord_to_index(&self, x: usize, y: usize) -> Option<usize> {
-        if x >= self.width || y >= self.height {
-            None
-        } else {
-            Some(x + y * self.width)
-        }
     }
 }
