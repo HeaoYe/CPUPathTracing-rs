@@ -1,8 +1,9 @@
+pub mod accelerate;
 pub mod camera;
 pub mod geometry;
+pub mod integrator;
 pub mod material;
 mod parallel;
-pub mod integrator;
 pub mod scene;
 pub mod util;
 

@@ -49,3 +49,9 @@ impl From<RGB> for glam::Vec3 {
             .powf(2.2)
     }
 }
+
+impl From<RGB> for glam::U8Vec3 {
+    fn from(value: RGB) -> Self {
+        glam::U8Vec3::new(value.r, value.g, value.b)
+    }
+}

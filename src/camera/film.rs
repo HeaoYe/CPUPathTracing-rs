@@ -1,4 +1,8 @@
-use crate::util::RGB;
+use crate::{
+    THREAD_POOL,
+    util::{RGB, profile},
+};
+use std::io::Write;
 
 #[derive(Default, Clone)]
 pub struct Pixel {
@@ -45,20 +49,17 @@ impl Film {
     }
 
     pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        use std::{
-            fs::File,
-            io::{BufWriter, Write},
-        };
+        profile!("Save to {}", filename.as_ref().display());
 
-        let file = File::create(filename)?;
-        let mut writer = BufWriter::new(file);
+        let mut file = std::fs::File::create(filename)?;
+        let mut buffer = vec![[0u8; 3]; self.width * self.height];
+        file.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
 
-        writer.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
-        for pixel in &self.pixels {
-            let rgb = RGB::from(pixel.average());
-            writer.write_all(&rgb.to_array())?;
-        }
-        writer.flush()?;
+        THREAD_POOL.parallel_for_2d_coarse(self.width, self.height, &mut buffer, |x, y, pixel| {
+            let rgb = RGB::from(self.pixels[y * self.width + x].average());
+            *pixel = rgb.to_array();
+        });
+        file.write_all(buffer.as_flattened())?;
 
         Ok(())
     }

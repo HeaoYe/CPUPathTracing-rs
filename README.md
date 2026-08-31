@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**8 / 25 — 一些代码重构**
+当前进度：**9 / 25 — 性能优化（上）：并行优化**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -20,7 +20,7 @@
 - [x] [Lecture06](../../tree/Lecture06) 平面与场景
 - [x] [Lecture07](../../tree/Lecture07) 材质与极简光追
 - [x] [Lecture08](../../tree/Lecture08) 一些代码重构
-- [ ] Lecture09 性能优化（上）：并行优化
+- [x] [Lecture09](../../tree/Lecture09) 性能优化（上）：并行优化
 - [ ] Lecture10 性能优化（中）：高性能 BVH 加速结构
 - [ ] Lecture11 性能优化（下）：场景管理
 - [ ] Lecture12 路径追踪与重要性采样
