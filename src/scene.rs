@@ -1,5 +1,8 @@
-use crate::geometry::{Intersection, Ray, Shape};
-use crate::material::Material;
+use crate::{
+    accelerate::{Bounds, Bvh},
+    geometry::{Bounded, Centroid, Intersection, Ray, Shape},
+    material::Material,
+};
 
 pub struct InstanceTransform {
     pub translation: glam::Vec3,
@@ -24,31 +27,71 @@ impl InstanceTransform {
 }
 
 struct ShapeInstance<'a> {
+    bounds: Bounds,
     shape: &'a dyn Shape,
     material: Material,
     world_from_object: glam::Affine3A,
     object_from_world: glam::Affine3A,
 }
 
-#[derive(Default)]
-pub struct Scene<'a> {
-    instances: Vec<ShapeInstance<'a>>,
-}
+impl<'a> ShapeInstance<'a> {
+    pub fn new<T>(shape: &'a T, material: Material, world_from_object: glam::Affine3A) -> Self
+    where
+        T: Shape + Bounded,
+    {
+        let mut bounds = Bounds::default();
+        let bounds_object = shape.bounds();
+        for idx in 0..8 {
+            let corner_objecr = bounds_object.corner(idx);
+            let corner_world = world_from_object.transform_point3(corner_objecr);
+            bounds.extend_point(corner_world);
+        }
 
-impl<'a> Scene<'a> {
-    pub fn add_shape(
-        &mut self,
-        shape: &'a dyn Shape,
-        material: Material,
-        transform: InstanceTransform,
-    ) {
-        let world_from_object = transform.into_affine();
-        self.instances.push(ShapeInstance {
+        Self {
+            bounds,
             shape,
             material,
             world_from_object,
             object_from_world: world_from_object.inverse(),
-        });
+        }
+    }
+}
+
+impl Bounded for ShapeInstance<'_> {
+    fn bounds(&self) -> Bounds {
+        self.bounds
+    }
+}
+
+impl Centroid for ShapeInstance<'_> {
+    fn centroid(&self) -> glam::Vec3 {
+        (self.bounds.b_min() + self.bounds.b_max()) * 0.5
+    }
+}
+
+#[derive(Default)]
+pub struct SceneBuilder<'a> {
+    instances: Vec<ShapeInstance<'a>>,
+}
+
+pub struct Scene<'a> {
+    bvh: Bvh<ShapeInstance<'a>>,
+}
+
+impl<'a> SceneBuilder<'a> {
+    pub fn add_shape<T>(&mut self, shape: &'a T, material: Material, transform: InstanceTransform)
+    where
+        T: Shape + Bounded,
+    {
+        let world_from_object = transform.into_affine();
+        self.instances
+            .push(ShapeInstance::new(shape, material, world_from_object));
+    }
+
+    pub fn build(self) -> Scene<'a> {
+        Scene {
+            bvh: Bvh::new(self.instances),
+        }
     }
 }
 
@@ -58,30 +101,37 @@ pub struct HitInfo<'a> {
 }
 
 impl Scene<'_> {
-    pub fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<HitInfo<'_>> {
-        let mut closest = None;
-        for instance in &self.instances {
-            let ray_object = ray.transform(instance.object_from_world);
-            if let Some(intersection) = instance.shape.intersect(&ray_object, t_min, t_max) {
-                t_max = intersection.t;
-                closest = Some((instance, intersection));
-            }
-        }
+    pub fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitInfo<'_>> {
+        self.bvh.intersect_with(
+            ray,
+            t_min,
+            t_max,
+            |instance, ray, t_min, t_max| {
+                let ray_object = ray.transform(instance.object_from_world);
+                let intersection = instance.shape.intersect(&ray_object, t_min, t_max);
 
-        let (closest_instance, mut closest_intersection) = closest?;
+                #[cfg(debug_assertions)]
+                ray.debug_info
+                    .borrow_mut()
+                    .extend(ray_object.debug_info.into_inner());
 
-        closest_intersection.hit_point = closest_instance
-            .world_from_object
-            .transform_point3(closest_intersection.hit_point);
-        closest_intersection.normal = closest_instance
-            .object_from_world
-            .matrix3
-            .mul_transpose_vec3(closest_intersection.normal)
-            .normalize();
+                intersection.map(|intersection| (intersection.t, (instance, intersection)))
+            },
+            |(closest_instance, mut closest_intersection)| {
+                closest_intersection.hit_point = closest_instance
+                    .world_from_object
+                    .transform_point3(closest_intersection.hit_point);
+                closest_intersection.normal = closest_instance
+                    .object_from_world
+                    .matrix3
+                    .mul_transpose_vec3(closest_intersection.normal)
+                    .normalize();
 
-        Some(HitInfo {
-            intersection: closest_intersection,
-            material: &closest_instance.material,
-        })
+                HitInfo {
+                    intersection: closest_intersection,
+                    material: &closest_instance.material,
+                }
+            },
+        )
     }
 }

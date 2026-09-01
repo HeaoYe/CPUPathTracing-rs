@@ -65,6 +65,20 @@ impl Bounds {
         (diag.x * (diag.y + diag.z) + diag.y * diag.z) * 2.0
     }
 
+    pub fn corner(&self, idx: usize) -> glam::Vec3 {
+        let mut corner = self.b_max;
+        if (idx & 0b1) == 0 {
+            corner.x = self.b_min.x;
+        }
+        if (idx & 0b10) == 0 {
+            corner.y = self.b_min.y;
+        }
+        if (idx & 0b100) == 0 {
+            corner.z = self.b_min.z;
+        }
+        corner
+    }
+
     pub fn b_min(&self) -> glam::Vec3 {
         self.b_min
     }

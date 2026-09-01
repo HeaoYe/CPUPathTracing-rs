@@ -13,6 +13,3 @@ pub use ray::Ray;
 pub use shape::{Bounded, Centroid, Intersection, Shape};
 pub use sphere::Sphere;
 pub use triangle::Triangle;
-
-#[cfg(debug_assertions)]
-pub use shape::IntersectionDebugInfo;
