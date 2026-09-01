@@ -1,7 +1,4 @@
-use crate::{
-    THREAD_POOL,
-    util::{RGB, profile},
-};
+use crate::{THREAD_POOL, util::Rgb};
 use std::io::Write;
 
 #[derive(Default, Clone)]
@@ -12,14 +9,14 @@ pub struct Pixel {
 
 pub enum PixelSample {
     Radiance(glam::Vec3),
-    RGB(crate::util::RGB),
+    Rgb(crate::util::Rgb),
 }
 
 impl Pixel {
     pub fn add_sample(&mut self, sample: PixelSample) {
         match sample {
             PixelSample::Radiance(radiance) => self.color_sum += radiance,
-            PixelSample::RGB(rgb) => self.color_sum += glam::Vec3::from(rgb),
+            PixelSample::Rgb(rgb) => self.color_sum += glam::Vec3::from(rgb),
         }
         self.sample_count += 1;
     }
@@ -49,14 +46,12 @@ impl Film {
     }
 
     pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        profile!("Save to {}", filename.as_ref().display());
-
         let mut file = std::fs::File::create(filename)?;
         let mut buffer = vec![[0u8; 3]; self.width * self.height];
         file.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
 
         THREAD_POOL.parallel_for_2d_coarse(self.width, self.height, &mut buffer, |x, y, pixel| {
-            let rgb = RGB::from(self.pixels[y * self.width + x].average());
+            let rgb = Rgb::from(self.pixels[y * self.width + x].average());
             *pixel = rgb.to_array();
         });
         file.write_all(buffer.as_flattened())?;

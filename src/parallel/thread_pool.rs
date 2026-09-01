@@ -72,6 +72,12 @@ impl ThreadPool {
             .fetch_add(1, Ordering::Relaxed);
     }
 
+    // SAFETY: 调用者必须使用 THREAD_POOL.wait() 确保任务的生命周期满足要求。
+    pub unsafe fn add_scope_task_unchecked(&self, task: ScopeTask) {
+        let task: Task = unsafe { std::mem::transmute(task) };
+        self.add_task(task);
+    }
+
     pub fn wait(&self) {
         self.context.wait();
     }

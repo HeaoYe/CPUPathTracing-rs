@@ -1,4 +1,5 @@
-use super::{Intersection, Ray, Shape};
+use super::{Bounded, Centroid, Intersection, Ray, Shape};
+use crate::accelerate::Bounds;
 
 pub struct Sphere {
     pub center: glam::Vec3,
@@ -22,13 +23,25 @@ impl Shape for Sphere {
         }
         if hit_t > t_min && hit_t < t_max {
             let hit_point = ray.at(hit_t);
-            Some(Intersection {
-                t: hit_t,
-                hit_point,
-                normal: (hit_point - self.center).normalize(),
-            })
+            Some(Intersection::new(
+                ray,
+                hit_t,
+                (hit_point - self.center).normalize(),
+            ))
         } else {
             None
         }
+    }
+}
+
+impl Bounded for Sphere {
+    fn bounds(&self) -> Bounds {
+        Bounds::new(self.center - self.radius, self.center + self.radius)
+    }
+}
+
+impl Centroid for Sphere {
+    fn centroid(&self) -> glam::Vec3 {
+        self.center
     }
 }

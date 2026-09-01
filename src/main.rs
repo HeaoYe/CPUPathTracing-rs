@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         45.0,
     );
 
-    let model = geometry::Model::load("models/simple_dragon.obj")?;
+    let model = geometry::Model::load("models/dragon_871k.obj")?;
     let sphere = geometry::Sphere {
         center: glam::Vec3::ZERO,
         radius: 1.0,
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut scene = scene::Scene::default();
     scene.add_shape(
         &model,
-        material::Material::from_lambertian(util::RGB::new(202, 159, 117)),
+        material::Material::from_lambertian(util::Rgb::new(202, 159, 117)),
         scene::InstanceTransform {
             scale: glam::Vec3::new(1.0, 3.0, 2.0),
             ..Default::default()
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sphere,
         material::Material::from_lambertian_emissive(
             glam::Vec3::ONE,
-            util::RGB::new(255, 128, 128),
+            util::Rgb::new(255, 128, 128),
         ),
         scene::InstanceTransform {
             translation: glam::Vec3::new(0.0, 0.0, 2.5),
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sphere,
         material::Material::from_lambertian_emissive(
             glam::Vec3::ONE,
-            util::RGB::new(128, 128, 255),
+            util::Rgb::new(128, 128, 255),
         ),
         scene::InstanceTransform {
             translation: glam::Vec3::new(0.0, 0.0, -2.5),
@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     scene.add_shape(
         &plane,
-        material::Material::from_lambertian(util::RGB::new(120, 204, 157)),
+        material::Material::from_lambertian(util::Rgb::new(120, 204, 157)),
         scene::InstanceTransform {
             translation: glam::Vec3::new(0.0, -0.5, 0.0),
             ..Default::default()
@@ -73,6 +73,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &scene,
         1,
         "normal.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::BoundsTestIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "bounds_test.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::TriangleTestIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "triangle_test.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::BvhDepthIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "bvh_depth.ppm",
     )?;
 
     integrator::render(

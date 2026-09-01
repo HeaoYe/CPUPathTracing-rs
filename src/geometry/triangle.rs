@@ -1,4 +1,5 @@
-use super::{Intersection, Ray, Shape};
+use super::{Bounded, Centroid, Intersection, Ray, Shape};
+use crate::accelerate::Bounds;
 
 pub struct Triangle {
     pub p0: glam::Vec3,
@@ -46,15 +47,25 @@ impl Shape for Triangle {
 
         let hit_t = s2.dot(e2) * inv_det;
         if hit_t > t_min && hit_t < t_max {
-            let hit_point = ray.at(hit_t);
             let normal = ((1.0 - u - v) * self.n0 + u * self.n1 + v * self.n2).normalize();
-            Some(Intersection {
-                t: hit_t,
-                hit_point,
-                normal,
-            })
+            Some(Intersection::new(ray, hit_t, normal))
         } else {
             None
         }
+    }
+}
+
+impl Bounded for Triangle {
+    fn bounds(&self) -> Bounds {
+        let mut bounds = Bounds::new(self.p0, self.p0);
+        bounds.extend_point(self.p1);
+        bounds.extend_point(self.p2);
+        bounds
+    }
+}
+
+impl Centroid for Triangle {
+    fn centroid(&self) -> glam::Vec3 {
+        (self.p0 + self.p1 + self.p2) / 3.0
     }
 }

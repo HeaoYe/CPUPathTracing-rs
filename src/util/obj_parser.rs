@@ -65,7 +65,7 @@ pub fn parse_obj(filename: impl AsRef<std::path::Path>) -> Result<ParesdObj, std
         let chunk_source = &source[chunk.range.clone()];
 
         for line in chunk_source.lines() {
-            let mut tokens = line.trim_start().split_whitespace();
+            let mut tokens = line.split_whitespace();
             match tokens.next() {
                 Some("v") => chunk.meta.vertex_count += 1,
                 Some("vn") => chunk.meta.normal_count += 1,
