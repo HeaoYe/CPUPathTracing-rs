@@ -53,6 +53,8 @@ git clone https://github.com/HeaoYe/CPUPathTracing-rs.git
 ```txt
  CPUPathTracing-rs
  ├── models
+ │   ├── dragon_87k.obj
+ │   ├── dragon_871k.obj
  │   └── simple_dragon.obj
  ├── .vscode/
  ├── src/

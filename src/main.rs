@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         45.0,
     );
 
-    let model = geometry::Model::load("models/simple_dragon.obj")?;
+    let model = geometry::Model::load("models/dragon_87k.obj")?;
     let sphere = geometry::Sphere {
         center: glam::Vec3::ZERO,
         radius: 1.0,

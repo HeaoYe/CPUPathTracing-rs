@@ -1,4 +1,5 @@
-use super::{Intersection, Ray, Shape};
+use super::{Bounded, Centroid, Intersection, Ray, Shape};
+use crate::accelerate::Bounds;
 
 pub struct Sphere {
     pub center: glam::Vec3,
@@ -30,5 +31,17 @@ impl Shape for Sphere {
         } else {
             None
         }
+    }
+}
+
+impl Bounded for Sphere {
+    fn bounds(&self) -> Bounds {
+        Bounds::new(self.center - self.radius, self.center + self.radius)
+    }
+}
+
+impl Centroid for Sphere {
+    fn centroid(&self) -> glam::Vec3 {
+        self.center
     }
 }

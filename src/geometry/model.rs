@@ -1,12 +1,11 @@
-use super::{Intersection, Ray, Shape, Triangle};
+use super::{Bounded, Intersection, Ray, Shape, Triangle};
 use crate::{
-    accelerate::Bounds,
+    accelerate::{Bounds, Bvh},
     util::{parse_obj, profile},
 };
 
 pub struct Model {
-    triangles: Vec<Triangle>,
-    bounds: Bounds,
+    bvh: Bvh<Triangle>,
 }
 
 impl Model {
@@ -37,36 +36,19 @@ impl Model {
             }
         }
 
-        let mut model = Self {
-            triangles,
-            bounds: Default::default(),
-        };
-        model.build();
-        Ok(model)
-    }
-
-    fn build(&mut self) {
-        for triangle in &self.triangles {
-            self.bounds.expand_point(triangle.p0);
-            self.bounds.expand_point(triangle.p1);
-            self.bounds.expand_point(triangle.p2);
-        }
+        let bvh = Bvh::new(triangles);
+        Ok(Model { bvh })
     }
 }
 
 impl Shape for Model {
-    fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
-        if !self.bounds.has_intersection(ray, t_min, t_max) {
-            return None;
-        }
+    fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
+        self.bvh.intersect(ray, t_min, t_max)
+    }
+}
 
-        let mut closest_intersection = None;
-        for triangle in &self.triangles {
-            if let Some(intersection) = triangle.intersect(ray, t_min, t_max) {
-                t_max = intersection.t;
-                closest_intersection = Some(intersection);
-            }
-        }
-        closest_intersection
+impl Bounded for Model {
+    fn bounds(&self) -> Bounds {
+        self.bvh.bounds()
     }
 }
