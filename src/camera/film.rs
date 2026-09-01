@@ -1,7 +1,4 @@
-use crate::{
-    THREAD_POOL,
-    util::{Rgb, profile},
-};
+use crate::{THREAD_POOL, util::Rgb};
 use std::io::Write;
 
 #[derive(Default, Clone)]
@@ -49,8 +46,6 @@ impl Film {
     }
 
     pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        profile!("Save to {}", filename.as_ref().display());
-
         let mut file = std::fs::File::create(filename)?;
         let mut buffer = vec![[0u8; 3]; self.width * self.height];
         file.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;

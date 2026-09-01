@@ -40,8 +40,29 @@ impl Bounds {
         near < far
     }
 
-    pub fn diag(&self) -> glam::Vec3 {
+    pub fn has_intersection_inv_dir(
+        &self,
+        origin: glam::Vec3,
+        inv_direction: glam::Vec3,
+        t_min: f32,
+        t_max: f32,
+    ) -> bool {
+        let t1 = (self.b_min - origin) * inv_direction;
+        let t2 = (self.b_max - origin) * inv_direction;
+
+        let near = t1.min(t2).max_element().max(t_min);
+        let far = t1.max(t2).min_element().min(t_max);
+
+        near < far
+    }
+
+    pub fn diagonal(&self) -> glam::Vec3 {
         self.b_max - self.b_min
+    }
+
+    pub fn area(&self) -> f32 {
+        let diag = self.diagonal();
+        (diag.x * (diag.y + diag.z) + diag.y * diag.z) * 2.0
     }
 
     pub fn b_min(&self) -> glam::Vec3 {
