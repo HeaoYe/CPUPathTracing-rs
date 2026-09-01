@@ -56,9 +56,6 @@ impl CameraModel {
         ndc = 2.0 * ndc - 1.0;
         let clip = ndc.extend(0.0).extend(1.0);
         let world = (self.world_from_camera * self.camera_from_clip * clip).truncate();
-        Ray {
-            origin: self.position,
-            direction: (world - self.position).normalize(),
-        }
+        Ray::new(self.position, (world - self.position).normalize())
     }
 }

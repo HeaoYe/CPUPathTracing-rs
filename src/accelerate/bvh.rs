@@ -31,6 +31,7 @@ struct BvhState {
     total_node_count: AtomicUsize,
     leaf_node_count: usize,
     max_leaf_node_primitive_count: usize,
+    max_leaf_node_depth: usize,
 }
 
 impl BvhState {
@@ -38,6 +39,7 @@ impl BvhState {
         self.leaf_node_count += 1;
         self.max_leaf_node_primitive_count =
             self.max_leaf_node_primitive_count.max(leaf.range.len());
+        self.max_leaf_node_depth = self.max_leaf_node_depth.max(leaf.depth);
     }
 }
 
@@ -88,13 +90,14 @@ impl<P: Bounded + Centroid + Send> Bvh<P> {
         println!("Leaf Node Count: {}", state.leaf_node_count);
         println!("Primitive Count: {}", bvh.ordered_primitives.len());
         println!(
-            "Max Leaf Node Primitive Count: {}",
-            state.max_leaf_node_primitive_count
-        );
-        println!(
             "Mean Leaf Node Primitive Count: {}",
             bvh.ordered_primitives.len() as f32 / state.leaf_node_count as f32
         );
+        println!(
+            "Max Leaf Node Primitive Count: {}",
+            state.max_leaf_node_primitive_count
+        );
+        println!("Max Leaf Node Depth: {}", state.max_leaf_node_depth);
 
         bvh
     }
@@ -333,12 +336,25 @@ impl<P> Bvh<P> {
     }
 }
 
-impl<P: Shape> Shape for Bvh<P> {
-    fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
-        let mut closest_intersection = None;
+impl<P> Bvh<P> {
+    pub fn intersect_with<'a, Intersect, Finalize, HitData, Output>(
+        &'a self,
+        ray: &Ray,
+        t_min: f32,
+        mut t_max: f32,
+        intersect: Intersect,
+        finalize: Finalize,
+    ) -> Option<Output>
+    where
+        Intersect: Fn(&'a P, &Ray, f32, f32) -> Option<(f32, HitData)>,
+        Finalize: FnOnce(HitData) -> Output,
+    {
+        let mut closest_hit_data = None;
 
         #[cfg(debug_assertions)]
-        let mut debug_info = crate::geometry::IntersectionDebugInfo::default();
+        let mut bounds_test_count = 0usize;
+        #[cfg(debug_assertions)]
+        let mut primitive_test_count = 0usize;
 
         let mut stack = [0u32; 32];
         let mut ptr = 0;
@@ -357,7 +373,7 @@ impl<P: Shape> Shape for Bvh<P> {
 
             #[cfg(debug_assertions)]
             {
-                debug_info.bounds_test_count += 1;
+                bounds_test_count += 1;
             }
 
             if !node
@@ -385,18 +401,14 @@ impl<P: Shape> Shape for Bvh<P> {
             } else {
                 #[cfg(debug_assertions)]
                 {
-                    debug_info.triangle_test_count += node.primitive_count as usize;
+                    primitive_test_count += node.primitive_count as usize;
                 }
                 for primitive in &self.ordered_primitives
                     [node.index as usize..(node.index + node.primitive_count as u32) as usize]
                 {
-                    if let Some(intersection) = primitive.intersect(ray, t_min, t_max) {
-                        t_max = intersection.t;
-                        closest_intersection = Some(intersection);
-                        #[cfg(debug_assertions)]
-                        {
-                            debug_info.bvh_depth = node.depth as usize;
-                        }
+                    if let Some((t, custom_data)) = intersect(primitive, ray, t_min, t_max) {
+                        t_max = t;
+                        closest_hit_data = Some(custom_data);
                     }
                 }
                 if ptr == 0 {
@@ -407,12 +419,30 @@ impl<P: Shape> Shape for Bvh<P> {
             }
         }
 
-        let closest_intersection = closest_intersection?;
-        Some(Intersection {
-            #[cfg(debug_assertions)]
-            debug_info,
-            ..closest_intersection
-        })
+        #[cfg(debug_assertions)]
+        {
+            let mut ray_debug_info = ray.debug_info.borrow_mut();
+            ray_debug_info.bounds_test_count += bounds_test_count;
+            ray_debug_info.primitive_test_count += primitive_test_count;
+        }
+
+        let closest_hit_data = closest_hit_data?;
+        Some(finalize(closest_hit_data))
+    }
+}
+
+impl<P: Shape> Shape for Bvh<P> {
+    fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
+        self.intersect_with(
+            ray,
+            t_min,
+            t_max,
+            |primitive, ray, t_min, t_max| {
+                let intersection = primitive.intersect(ray, t_min, t_max)?;
+                Some((intersection.t, intersection))
+            },
+            |data| data,
+        )
     }
 }
 
