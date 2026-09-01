@@ -1,12 +1,12 @@
 use std::ops::{Div, Mul};
 
-pub struct RGB {
+pub struct Rgb {
     pub r: u8,
     pub g: u8,
     pub b: u8,
 }
 
-impl RGB {
+impl Rgb {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
@@ -16,7 +16,7 @@ impl RGB {
     }
 }
 
-impl From<glam::Vec3> for RGB {
+impl From<glam::Vec3> for Rgb {
     fn from(value: glam::Vec3) -> Self {
         let rgb = value
             .powf(1.0 / 2.2)
@@ -31,7 +31,7 @@ impl From<glam::Vec3> for RGB {
     }
 }
 
-impl From<glam::U8Vec3> for RGB {
+impl From<glam::U8Vec3> for Rgb {
     fn from(value: glam::U8Vec3) -> Self {
         Self {
             r: value.x,
@@ -41,8 +41,8 @@ impl From<glam::U8Vec3> for RGB {
     }
 }
 
-impl From<RGB> for glam::Vec3 {
-    fn from(value: RGB) -> Self {
+impl From<Rgb> for glam::Vec3 {
+    fn from(value: Rgb) -> Self {
         glam::U8Vec3::new(value.r, value.g, value.b)
             .as_vec3()
             .div(255.0)
@@ -50,8 +50,8 @@ impl From<RGB> for glam::Vec3 {
     }
 }
 
-impl From<RGB> for glam::U8Vec3 {
-    fn from(value: RGB) -> Self {
+impl From<Rgb> for glam::U8Vec3 {
+    fn from(value: Rgb) -> Self {
         glam::U8Vec3::new(value.r, value.g, value.b)
     }
 }
