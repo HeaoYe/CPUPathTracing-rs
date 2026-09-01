@@ -1,14 +1,14 @@
 use super::Bounds;
 use crate::geometry::{Bounded, Centroid, Intersection, Ray, Shape};
 
-struct BvhNode<P> {
+struct BvhTreeNode<P> {
     bounds: Bounds,
     primitives: Vec<P>,
-    left: Option<Box<BvhNode<P>>>,
-    right: Option<Box<BvhNode<P>>>,
+    left: Option<Box<BvhTreeNode<P>>>,
+    right: Option<Box<BvhTreeNode<P>>>,
 }
 
-impl<P: Bounded> BvhNode<P> {
+impl<P: Bounded> BvhTreeNode<P> {
     fn update_bounds(&mut self) {
         for primitive in &self.primitives {
             self.bounds.extend_bounds(primitive.bounds());
@@ -17,12 +17,12 @@ impl<P: Bounded> BvhNode<P> {
 }
 
 pub struct Bvh<P> {
-    root: BvhNode<P>,
+    flattened_nodes: Vec<BvhNode<P>>,
 }
 
 impl<P: Bounded + Centroid> Bvh<P> {
     pub fn new(primitives: Vec<P>) -> Self {
-        let mut root = BvhNode {
+        let mut root = BvhTreeNode {
             bounds: Default::default(),
             primitives,
             left: None,
@@ -30,12 +30,15 @@ impl<P: Bounded + Centroid> Bvh<P> {
         };
         root.update_bounds();
 
-        let mut bvh = Bvh { root };
-        Bvh::recursive_split(&mut bvh.root);
-        bvh
+        Bvh::recursive_split(&mut root);
+
+        let mut flattened_nodes = Vec::new();
+        Bvh::recursive_flatten(root, &mut flattened_nodes);
+
+        Bvh { flattened_nodes }
     }
 
-    fn recursive_split(node: &mut BvhNode<P>) {
+    fn recursive_split(node: &mut BvhTreeNode<P>) {
         if node.primitives.len() == 1 {
             return;
         }
@@ -61,13 +64,13 @@ impl<P: Bounded + Centroid> Bvh<P> {
             return;
         }
 
-        let mut left = Box::new(BvhNode {
+        let mut left = Box::new(BvhTreeNode {
             bounds: Default::default(),
             primitives: left_primitives,
             left: None,
             right: None,
         });
-        let mut right = Box::new(BvhNode {
+        let mut right = Box::new(BvhTreeNode {
             bounds: Default::default(),
             primitives: right_primitives,
             left: None,
@@ -83,54 +86,89 @@ impl<P: Bounded + Centroid> Bvh<P> {
     }
 }
 
-impl<P: Shape> Bvh<P> {
-    fn recursive_intersect(
-        node: &BvhNode<P>,
-        ray: &Ray,
-        t_min: f32,
-        t_max: &mut f32,
-        closest_intersection: &mut Option<Intersection>,
-    ) {
-        if !node.bounds.has_intersection(ray, t_min, *t_max) {
-            return;
-        }
+struct BvhNode<P> {
+    bounds: Bounds,
+    primitives: Vec<P>,
+    right_child_index: usize,
+}
 
-        if node.primitives.is_empty() {
-            if let Some(left) = &node.left {
-                Bvh::recursive_intersect(left, ray, t_min, t_max, closest_intersection);
+impl<P> Bvh<P> {
+    fn recursive_flatten(
+        tree_node: BvhTreeNode<P>,
+        flattened_nodes: &mut Vec<BvhNode<P>>,
+    ) -> usize {
+        let BvhTreeNode {
+            bounds,
+            primitives,
+            left,
+            right,
+        } = tree_node;
+        let node = BvhNode {
+            bounds,
+            primitives,
+            right_child_index: 0,
+        };
+        let parent_index = flattened_nodes.len();
+        let is_leaf = !node.primitives.is_empty();
+        flattened_nodes.push(node);
+        if !is_leaf {
+            if let Some(left) = left {
+                Bvh::recursive_flatten(*left, flattened_nodes);
             }
-
-            if let Some(right) = &node.right {
-                Bvh::recursive_intersect(right, ray, t_min, t_max, closest_intersection);
-            }
-        } else {
-            for primitive in &node.primitives {
-                if let Some(intersection) = primitive.intersect(ray, t_min, *t_max) {
-                    *t_max = intersection.t;
-                    *closest_intersection = Some(intersection);
-                }
+            if let Some(right) = right {
+                let right_child_index = Bvh::recursive_flatten(*right, flattened_nodes);
+                flattened_nodes[parent_index].right_child_index = right_child_index;
             }
         }
+        parent_index
     }
 }
 
 impl<P: Shape> Shape for Bvh<P> {
-    fn intersect(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
+    fn intersect(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
         let mut closest_intersection = None;
-        let mut t_max = t_max;
-        Bvh::recursive_intersect(
-            &self.root,
-            ray,
-            t_min,
-            &mut t_max,
-            &mut closest_intersection,
-        );
+
+        let mut stack = [0u32; 32];
+        let mut ptr = 0;
+        let mut current_node = 0;
+
+        loop {
+            let node = &self.flattened_nodes[current_node];
+
+            if !node.bounds.has_intersection(ray, t_min, t_max) {
+                if ptr == 0 {
+                    break;
+                }
+                ptr -= 1;
+                current_node = stack[ptr] as usize;
+                continue;
+            }
+
+            if node.primitives.is_empty() {
+                stack[ptr] = node.right_child_index as u32;
+                ptr += 1;
+                current_node += 1;
+            } else {
+                for primitive in &node.primitives {
+                    if let Some(intersection) = primitive.intersect(ray, t_min, t_max) {
+                        t_max = intersection.t;
+                        closest_intersection = Some(intersection);
+                    }
+                }
+                if ptr == 0 {
+                    break;
+                }
+                ptr -= 1;
+                current_node = stack[ptr] as usize;
+            }
+        }
+
         closest_intersection
     }
 }
 
 impl<P> Bounded for Bvh<P> {
     fn bounds(&self) -> Bounds {
-        self.root.bounds
+        self.flattened_nodes.first().unwrap().bounds
     }
 }
