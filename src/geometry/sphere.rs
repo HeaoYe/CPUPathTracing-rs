@@ -23,11 +23,11 @@ impl Shape for Sphere {
         }
         if hit_t > t_min && hit_t < t_max {
             let hit_point = ray.at(hit_t);
-            Some(Intersection {
-                t: hit_t,
-                hit_point,
-                normal: (hit_point - self.center).normalize(),
-            })
+            Some(Intersection::new(
+                ray,
+                hit_t,
+                (hit_point - self.center).normalize(),
+            ))
         } else {
             None
         }

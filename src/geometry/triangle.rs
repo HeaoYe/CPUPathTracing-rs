@@ -47,13 +47,8 @@ impl Shape for Triangle {
 
         let hit_t = s2.dot(e2) * inv_det;
         if hit_t > t_min && hit_t < t_max {
-            let hit_point = ray.at(hit_t);
             let normal = ((1.0 - u - v) * self.n0 + u * self.n1 + v * self.n2).normalize();
-            Some(Intersection {
-                t: hit_t,
-                hit_point,
-                normal,
-            })
+            Some(Intersection::new(ray, hit_t, normal))
         } else {
             None
         }

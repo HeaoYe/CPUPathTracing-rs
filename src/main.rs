@@ -76,6 +76,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     integrator::render(
+        &integrator::BoundsTestIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "bounds_test.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::TriangleTestIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "triangle_test.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::BvhDepthIntegrator,
+        &mut camera,
+        &scene,
+        1,
+        "bvh_depth.ppm",
+    )?;
+
+    integrator::render(
         &integrator::SimpleRTIntegrator,
         &mut camera,
         &scene,
