@@ -4,6 +4,7 @@ pub mod geometry;
 pub mod integrator;
 pub mod material;
 mod parallel;
+pub mod sample;
 pub mod scene;
 pub mod util;
 

@@ -112,11 +112,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     integrator::render(
-        &integrator::SimpleRTIntegrator,
+        &integrator::SimpleRtIntegrator,
         &mut camera,
         &scene,
         128,
-        "test.ppm",
+        "rt_test.ppm",
+    )?;
+
+    integrator::render(
+        &integrator::SimplePathTracingIntegrator,
+        &mut camera,
+        &scene,
+        128,
+        "pt_cosine_test.ppm",
     )?;
 
     Ok(())

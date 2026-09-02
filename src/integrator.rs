@@ -1,10 +1,12 @@
 mod debug_integrator;
 mod normal_integrator;
+mod simple_path_tracing_integrator;
 mod simple_rt_integrator;
 
 pub use debug_integrator::{BoundsTestIntegrator, PrimitiveTestIntegrator};
 pub use normal_integrator::NormalIntegrator;
-pub use simple_rt_integrator::SimpleRTIntegrator;
+pub use simple_path_tracing_integrator::SimplePathTracingIntegrator;
+pub use simple_rt_integrator::SimpleRtIntegrator;
 
 use crate::{
     THREAD_POOL,
