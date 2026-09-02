@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**12 / 25 — 路径追踪与重要性采样**
+当前进度：**13 / 25 — 代码勘误与新材质类**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -24,7 +24,7 @@
 - [x] [Lecture10](../../tree/Lecture10) 性能优化（中）：高性能 BVH 加速结构
 - [x] [Lecture11](../../tree/Lecture11) 性能优化（下）：场景管理
 - [x] [Lecture12](../../tree/Lecture12) 路径追踪与重要性采样
-- [ ] Lecture13 代码勘误与新材质类
+- [x] [Lecture13](../../tree/Lecture13) 代码勘误与新材质类
 - [ ] Lecture14 电介质与导体
 - [ ] Lecture15 往期勘误与代码重构
 - [ ] Lecture16 微表面理论

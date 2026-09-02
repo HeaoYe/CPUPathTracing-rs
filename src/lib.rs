@@ -1,4 +1,5 @@
 pub mod accelerate;
+pub mod bsdf;
 pub mod camera;
 pub mod geometry;
 pub mod integrator;

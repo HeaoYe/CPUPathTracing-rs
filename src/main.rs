@@ -27,25 +27,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let u = rng.uniform();
         if u < 0.9 {
+            let albedo = util::Rgb::new(202, 159, 117);
             builder.add_shape(
                 &model,
-                material::Material {
-                    albedo: util::Rgb::new(202, 159, 117).into(),
-                    is_specular: rng.uniform() < 0.5,
-                    emissive: glam::Vec3::ZERO,
+                if rng.uniform() > 0.5 {
+                    material::Material::diffuse(albedo)
+                } else {
+                    material::Material::specular(albedo)
                 },
                 scene::InstanceTransform {
                     translation: random_pos,
-                    rotation: glam::Quat::from_rotation_x((rng.uniform() * 360.0).to_radians())
-                        * glam::Quat::from_rotation_y((rng.uniform() * 360.0).to_radians())
-                        * glam::Quat::from_rotation_z((rng.uniform() * 360.0).to_radians()),
+                    rotation: glam::Quat::from_euler(
+                        glam::EulerRot::XYZ,
+                        (rng.uniform() * 360.0).to_radians(),
+                        (rng.uniform() * 360.0).to_radians(),
+                        (rng.uniform() * 360.0).to_radians(),
+                    ),
                     ..Default::default()
                 },
             );
         } else if u < 0.95 {
             builder.add_shape(
                 &sphere,
-                material::Material::from_specular(glam::Vec3::new(
+                material::Material::specular(glam::Vec3::new(
                     rng.uniform(),
                     rng.uniform(),
                     rng.uniform(),
@@ -60,14 +64,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             random_pos.y += 6.0;
             builder.add_shape(
                 &sphere,
-                material::Material::from_lambertian_emissive(
-                    glam::Vec3::ONE,
-                    glam::Vec3::new(
-                        rng.uniform() * 4.0,
-                        rng.uniform() * 4.0,
-                        rng.uniform() * 4.0,
-                    ),
-                ),
+                material::Material::default().with_emissive(glam::Vec3::new(
+                    rng.uniform() * 4.0,
+                    rng.uniform() * 4.0,
+                    rng.uniform() * 4.0,
+                )),
                 scene::InstanceTransform {
                     translation: random_pos,
                     ..Default::default()
@@ -78,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     builder.add_shape(
         &plane,
-        material::Material::from_lambertian(util::Rgb::new(120, 204, 157)),
+        material::Material::diffuse(util::Rgb::new(120, 204, 157)),
         scene::InstanceTransform {
             translation: glam::Vec3::new(0.0, -0.5, 0.0),
             ..Default::default()
@@ -109,14 +110,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &scene,
         1,
         "primitive_test.ppm",
-    )?;
-
-    integrator::render(
-        &integrator::SimpleRtIntegrator,
-        &mut camera,
-        &scene,
-        128,
-        "rt_test.ppm",
     )?;
 
     integrator::render(
