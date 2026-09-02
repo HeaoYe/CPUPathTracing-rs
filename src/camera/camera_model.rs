@@ -1,11 +1,11 @@
 use crate::geometry::Ray;
 
 pub struct CameraModel {
-    position: glam::Vec3,
-    direction: glam::Vec3,
-    vertical_fov: f32,
-    film_width: f32,
-    film_height: f32,
+    pub(super) position: glam::Vec3,
+    pub(super) direction: glam::Vec3,
+    pub(super) vertical_fov: f32,
+    pub(super) film_width: f32,
+    pub(super) film_height: f32,
 
     camera_from_clip: glam::Mat4,
     world_from_camera: glam::Affine3A,
@@ -32,7 +32,7 @@ impl CameraModel {
         geometry
     }
 
-    fn caculate_matrix(&mut self) {
+    pub(super) fn caculate_matrix(&mut self) {
         let clip_from_camera = glam::camera::lh::proj::directx::perspective(
             self.vertical_fov.to_radians(),
             self.film_width / self.film_height,
