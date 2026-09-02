@@ -23,10 +23,9 @@ impl Frame {
     }
 
     pub fn world_from_local(&self, direction_local: glam::Vec3) -> glam::Vec3 {
-        (direction_local.x * self.x_axis
+        direction_local.x * self.x_axis
             + direction_local.y * self.y_axis
-            + direction_local.z * self.z_axis)
-            .normalize()
+            + direction_local.z * self.z_axis
     }
 
     pub fn local_from_world(&self, direction_world: glam::Vec3) -> glam::Vec3 {
@@ -35,6 +34,5 @@ impl Frame {
             direction_world.dot(self.y_axis),
             direction_world.dot(self.z_axis),
         )
-        .normalize()
     }
 }
