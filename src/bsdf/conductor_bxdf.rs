@@ -1,14 +1,22 @@
-use super::bxdf::{Bxdf, ScatteringSample};
+use super::{
+    bxdf::{Bxdf, ScatteringSample},
+    microfacet_theory::MicrofacetTheory,
+};
 use crate::util::Complex;
 
 pub struct ConductorBxdf {
     eta: glam::Vec3,
     k: glam::Vec3,
+    microfacet_theory: MicrofacetTheory,
 }
 
 impl ConductorBxdf {
-    pub fn new(eta: glam::Vec3, k: glam::Vec3) -> Self {
-        Self { eta, k }
+    pub fn new(eta: glam::Vec3, k: glam::Vec3, alpha_x: f32, alpha_z: f32) -> Self {
+        Self {
+            eta,
+            k,
+            microfacet_theory: MicrofacetTheory::new(alpha_x, alpha_z),
+        }
     }
 }
 
@@ -36,18 +44,52 @@ impl Bxdf for ConductorBxdf {
         &self,
         _hit_point: glam::Vec3,
         view_direction: glam::Vec3,
-        _rng: &mut crate::util::Rng,
+        rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {
         if view_direction.y <= 0.0 {
             return None;
         }
 
-        let light_direction =
-            glam::Vec3::new(-view_direction.x, view_direction.y, -view_direction.z);
-        let bsdf = fresnel(self.eta, self.k, view_direction.y) / light_direction.y.abs();
+        let microfacet_normal = if !self.microfacet_theory.is_delta_distribution() {
+            self.microfacet_theory
+                .sample_visible_normal(view_direction, rng)
+        } else {
+            glam::Vec3::Y
+        };
+
+        let cos_theta_i = view_direction.dot(microfacet_normal);
+
+        let fr = fresnel(self.eta, self.k, cos_theta_i.abs());
+        let light_direction = -view_direction + 2.0 * cos_theta_i * microfacet_normal;
+        if light_direction.y * view_direction.y <= 0.0 {
+            return None;
+        }
+
+        if self.microfacet_theory.is_delta_distribution() {
+            return Some(ScatteringSample {
+                bsdf: fr / light_direction.y.abs(),
+                pdf: 1.0,
+                light_direction,
+            });
+        }
+
+        let bsdf = fr
+            * self
+                .microfacet_theory
+                .normal_distribution(microfacet_normal)
+            * self.microfacet_theory.height_correlated_masking_shadowing(
+                light_direction,
+                view_direction,
+                microfacet_normal,
+            )
+            / (4.0 * light_direction.y * view_direction.y).abs();
+        let pdf = self
+            .microfacet_theory
+            .visible_normal_distribution(view_direction, microfacet_normal)
+            / (4.0 * cos_theta_i).abs();
         Some(ScatteringSample {
             bsdf,
-            pdf: 1.0,
+            pdf,
             light_direction,
         })
     }

@@ -3,6 +3,7 @@ mod conductor_bxdf;
 mod dielectric_bxdf;
 mod diffuse_bxdf;
 mod ground_bxdf;
+mod microfacet_theory;
 mod specular_bxdf;
 
 pub use bxdf::{Bxdf, ScatteringSample};

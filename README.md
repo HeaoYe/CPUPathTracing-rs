@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**15 / 25 — 往期勘误与代码重构**
+当前进度：**16 / 25 — 微表面理论**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -27,7 +27,7 @@
 - [x] [Lecture13](../../tree/Lecture13) 代码勘误与新材质类
 - [x] [Lecture14](../../tree/Lecture14) 电介质与导体
 - [x] [Lecture15](../../tree/Lecture15) 往期勘误与代码重构
-- [ ] Lecture16 微表面理论
+- [x] [Lecture16](../../tree/Lecture16) 微表面理论
 - [ ] Lecture17 实时预览
 - [ ] Lecture18 向光源采样
 - [ ] Lecture19 多重重要性采样

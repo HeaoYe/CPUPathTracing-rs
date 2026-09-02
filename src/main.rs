@@ -1,25 +1,34 @@
 use cpu_path_tracing::{camera, geometry, integrator, material, scene, util};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let film = camera::Film::new(192 * 4, 108 * 4);
-    let mut camera =
-        camera::Camera::new(film, [-10.0, 1.5, 0.0].into(), [0.0, 0.0, 0.0].into(), 45.0);
+    let film = camera::Film::new(192 * 10, 108 * 10);
+    let mut camera = camera::Camera::new(
+        film,
+        glam::vec3(-9.5, 1.5, 0.0),
+        glam::vec3(0.0, 0.0, 0.0),
+        45.0,
+    );
 
     let model = geometry::Model::load("models/dragon_871k.obj")?;
     let sphere = geometry::Sphere {
         center: glam::Vec3::ZERO,
         radius: 1.0,
     };
-    let plane = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, f32::MAX);
+    let plane = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, 100.0);
 
     let mut builder = scene::SceneBuilder::default();
 
     for i in -3..=3 {
         builder.add_shape(
             &sphere,
-            material::Material::dielectric_with_tint(1.0 + 0.2 * (i + 3) as f32, glam::Vec3::ONE),
+            material::Material::dielectric_with_alpha_tint(
+                1.0 + 0.2 * (i + 3) as f32,
+                glam::Vec3::ONE,
+                (3.0 - i as f32) / 18.0,
+                (3.0 - i as f32) / 6.0,
+            ),
             scene::InstanceTransform {
-                translation: [0.0, 0.5, i as f32 * 2.0].into(),
+                translation: glam::vec3(0.0, 0.5, i as f32 * 2.0),
                 scale: glam::Vec3::splat(0.8),
                 ..Default::default()
             },
@@ -30,9 +39,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let c = glam::Vec3::from(util::Rgb::generate_heatmap_rgb((i as f32 + 3.0) / 6.0));
         builder.add_shape(
             &sphere,
-            material::Material::conductor(2.0 - c * 2.0, 2.0 + c * 3.0),
+            material::Material::conductor_with_alpha(
+                2.0 - c * 2.0,
+                2.0 + c * 3.0,
+                (3.0 - i as f32) / 6.0,
+                (3.0 - i as f32) / 18.0,
+            ),
             scene::InstanceTransform {
-                translation: [0.0, 2.5, i as f32 * 2.0].into(),
+                translation: glam::vec3(0.0, 2.5, i as f32 * 2.0),
                 scale: glam::Vec3::splat(0.8),
                 ..Default::default()
             },
@@ -41,9 +55,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     builder.add_shape(
         &model,
-        material::Material::dielectric_with_tint(1.8, util::Rgb::new(128, 191, 131)),
+        material::Material::dielectric_with_alpha_tint(
+            1.8,
+            util::Rgb::new(128, 211, 131),
+            0.4,
+            0.4,
+        ),
         scene::InstanceTransform {
-            translation: [-5.0, 0.4, 1.5].into(),
+            translation: glam::vec3(-5.0, 0.4, 1.5),
             scale: glam::Vec3::splat(2.0),
             ..Default::default()
         },
@@ -51,9 +70,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     builder.add_shape(
         &model,
-        material::Material::conductor([0.1, 1.2, 1.8], [5.0, 2.5, 2.0]),
+        material::Material::conductor_with_alpha([0.1, 1.2, 1.8], [5.0, 2.5, 2.0], 0.4, 0.4),
         scene::InstanceTransform {
-            translation: [-5.0, 0.4, -1.5].into(),
+            translation: glam::vec3(-5.0, 0.4, -1.5),
             scale: glam::Vec3::splat(2.0),
             ..Default::default()
         },
@@ -63,16 +82,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &plane,
         material::Material::ground(util::Rgb::new(120, 204, 157)),
         scene::InstanceTransform {
-            translation: [0.0, -0.5, 0.0].into(),
+            translation: glam::vec3(0.0, -0.5, 0.0),
             ..Default::default()
         },
     );
 
     builder.add_shape(
-        &plane,
-        material::Material::default().with_emissive([0.75, 0.75, 0.8]),
+        &sphere,
+        material::Material::default().with_emissive([0.95 * 5.0, 0.95 * 5.0, 1.0 * 5.0]),
         scene::InstanceTransform {
-            translation: [0.0, 10.0, 0.0].into(),
+            translation: glam::vec3(-2.0, 6.0, 0.0),
+            scale: glam::Vec3::splat(2.0),
             ..Default::default()
         },
     );
@@ -107,8 +127,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &integrator::SimplePathTracingIntegrator,
         &mut camera,
         &scene,
-        128,
-        "pt_cosine_test.ppm",
+        4096,
+        "PT_microfacet_test.ppm",
     )?;
 
     Ok(())
