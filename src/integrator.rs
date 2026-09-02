@@ -1,9 +1,11 @@
 mod debug_integrator;
 mod normal_integrator;
+mod previewer;
 mod simple_path_tracing_integrator;
 
 pub use debug_integrator::{BoundsTestIntegrator, PrimitiveTestIntegrator};
 pub use normal_integrator::NormalIntegrator;
+pub use previewer::preview;
 pub use simple_path_tracing_integrator::SimplePathTracingIntegrator;
 
 use crate::{
@@ -36,7 +38,7 @@ where
 {
     profile!("render {} spp {}", spp, filename.as_ref().display());
 
-    let Camera { film, geometry } = camera;
+    let Camera { film, model } = camera;
     film.clear();
 
     let mut current_spp = 0;
@@ -51,9 +53,8 @@ where
             film.height(),
             film.as_slice_mut(),
             |x, y, pixel| {
-                for i in 0..batch_spp {
-                    if let Some(sample) =
-                        integrator.integrate(x, y, current_spp + i, geometry, scene)
+                for i in 1..=batch_spp {
+                    if let Some(sample) = integrator.integrate(x, y, current_spp + i, model, scene)
                     {
                         pixel.add_sample(sample);
                     }

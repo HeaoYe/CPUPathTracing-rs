@@ -18,7 +18,7 @@ impl Integrator for SimplePathTracingIntegrator {
         camera: &CameraModel,
         scene: &Scene,
     ) -> Option<PixelSample> {
-        let mut rng = Rng::new(0, ((x + 1) * (y + 1) * (sample_index + 1)) as u64);
+        let mut rng = Rng::new(0, ((x + 1) * (y + 1) * sample_index) as u64);
 
         let mut ray = camera.generate_ray(
             glam::IVec2::new(x as i32, y as i32),

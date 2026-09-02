@@ -50,6 +50,18 @@ impl Film {
         }
     }
 
+    pub fn write_rgb_buffer(&self, width: usize, height: usize, dst: &mut [u32]) {
+        debug_assert_eq!(dst.len(), width * height);
+        THREAD_POOL.parallel_for_2d_coarse(width, height, dst, move |x, y, buffer| {
+            let x = x * self.width / width;
+            let y = y * self.height / height;
+            let index = y * self.width + x;
+            let pixel = self.pixels[index].average();
+            let [r, g, b] = Rgb::from(pixel).to_array();
+            *buffer = (r as u32) << 16 | (g as u32) << 8 | b as u32;
+        });
+    }
+
     pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         let mut file = std::fs::File::create(filename)?;
         let mut buffer = vec![[0u8; 3]; self.width * self.height];
@@ -68,6 +80,12 @@ impl Film {
         self.pixels.clear();
         self.pixels
             .resize(self.width * self.height, Default::default());
+    }
+
+    pub fn set_resolution(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+        self.clear();
     }
 
     pub fn width(&self) -> usize {

@@ -4,9 +4,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let film = camera::Film::new(192 * 10, 108 * 10);
     let mut camera = camera::Camera::new(
         film,
-        glam::vec3(-9.5, 1.5, 0.0),
-        glam::vec3(0.0, 0.0, 0.0),
-        45.0,
+        glam::vec3(-3.488137, 0.184000, -2.268835),
+        glam::vec3(-4.255267, 0.356399, -1.650943),
+        68.0,
     );
 
     let model = geometry::Model::load("models/dragon_871k.obj")?;
@@ -99,37 +99,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let scene = builder.build();
 
-    integrator::render(
-        &integrator::NormalIntegrator,
-        &mut camera,
-        &scene,
-        1,
-        "normal.ppm",
-    )?;
-
-    integrator::render(
-        &integrator::BoundsTestIntegrator,
-        &mut camera,
-        &scene,
-        1,
-        "bounds_test.ppm",
-    )?;
-
-    integrator::render(
-        &integrator::PrimitiveTestIntegrator,
-        &mut camera,
-        &scene,
-        1,
-        "primitive_test.ppm",
-    )?;
-
-    integrator::render(
-        &integrator::SimplePathTracingIntegrator,
-        &mut camera,
-        &scene,
-        4096,
-        "PT_microfacet_test.ppm",
-    )?;
+    let simple_path_tracing_integrator = integrator::SimplePathTracingIntegrator;
+    if integrator::preview(&simple_path_tracing_integrator, &mut camera, &scene) {
+        integrator::render(
+            &simple_path_tracing_integrator,
+            &mut camera,
+            &scene,
+            4096,
+            "PT_microfacet_test.ppm",
+        )?;
+    }
 
     Ok(())
 }
