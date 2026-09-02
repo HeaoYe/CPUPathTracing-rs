@@ -2,86 +2,77 @@ use cpu_path_tracing::{camera, geometry, integrator, material, scene, util};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let film = camera::Film::new(192 * 4, 108 * 4);
-    let mut camera = camera::Camera::new(
-        film,
-        glam::Vec3::new(-12.0, 5.0, -12.0),
-        glam::Vec3::new(0.0, 0.0, 0.0),
-        45.0,
-    );
+    let mut camera =
+        camera::Camera::new(film, [-10.0, 1.5, 0.0].into(), [0.0, 0.0, 0.0].into(), 45.0);
 
     let model = geometry::Model::load("models/dragon_871k.obj")?;
     let sphere = geometry::Sphere {
         center: glam::Vec3::ZERO,
         radius: 1.0,
     };
-    let plane = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, 100.0);
+    let plane = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, f32::MAX);
 
     let mut builder = scene::SceneBuilder::default();
-    let mut rng = util::Rng::new(1234, 0);
-    for _ in 0..10000 {
-        let mut random_pos = glam::Vec3::new(
-            rng.uniform() * 100.0 - 50.0,
-            rng.uniform() * 2.0,
-            rng.uniform() * 100.0 - 50.0,
-        );
 
-        let u = rng.uniform();
-        if u < 0.9 {
-            let albedo = util::Rgb::new(202, 159, 117);
-            builder.add_shape(
-                &model,
-                if rng.uniform() > 0.5 {
-                    material::Material::diffuse(albedo)
-                } else {
-                    material::Material::specular(albedo)
-                },
-                scene::InstanceTransform {
-                    translation: random_pos,
-                    rotation: glam::Quat::from_euler(
-                        glam::EulerRot::XYZ,
-                        (rng.uniform() * 360.0).to_radians(),
-                        (rng.uniform() * 360.0).to_radians(),
-                        (rng.uniform() * 360.0).to_radians(),
-                    ),
-                    ..Default::default()
-                },
-            );
-        } else if u < 0.95 {
-            builder.add_shape(
-                &sphere,
-                material::Material::specular(glam::Vec3::new(
-                    rng.uniform(),
-                    rng.uniform(),
-                    rng.uniform(),
-                )),
-                scene::InstanceTransform {
-                    translation: random_pos,
-                    scale: glam::Vec3::splat(0.3),
-                    ..Default::default()
-                },
-            );
-        } else {
-            random_pos.y += 6.0;
-            builder.add_shape(
-                &sphere,
-                material::Material::default().with_emissive(glam::Vec3::new(
-                    rng.uniform() * 4.0,
-                    rng.uniform() * 4.0,
-                    rng.uniform() * 4.0,
-                )),
-                scene::InstanceTransform {
-                    translation: random_pos,
-                    ..Default::default()
-                },
-            );
-        }
+    for i in -3..=3 {
+        builder.add_shape(
+            &sphere,
+            material::Material::dielectric_with_tint(1.0 + 0.2 * (i + 3) as f32, glam::Vec3::ONE),
+            scene::InstanceTransform {
+                translation: [0.0, 0.5, i as f32 * 2.0].into(),
+                scale: glam::Vec3::splat(0.8),
+                ..Default::default()
+            },
+        );
+    }
+
+    for i in -3..=3 {
+        let c = glam::Vec3::from(util::Rgb::generate_heatmap_rgb((i as f32 + 3.0) / 6.0));
+        builder.add_shape(
+            &sphere,
+            material::Material::conductor(2.0 - c * 2.0, 2.0 + c * 3.0),
+            scene::InstanceTransform {
+                translation: [0.0, 2.5, i as f32 * 2.0].into(),
+                scale: glam::Vec3::splat(0.8),
+                ..Default::default()
+            },
+        );
     }
 
     builder.add_shape(
-        &plane,
-        material::Material::diffuse(util::Rgb::new(120, 204, 157)),
+        &model,
+        material::Material::dielectric_with_tint(1.8, util::Rgb::new(128, 191, 131)),
         scene::InstanceTransform {
-            translation: glam::Vec3::new(0.0, -0.5, 0.0),
+            translation: [-5.0, 0.4, 1.5].into(),
+            scale: glam::Vec3::splat(2.0),
+            ..Default::default()
+        },
+    );
+
+    builder.add_shape(
+        &model,
+        material::Material::conductor([0.1, 1.2, 1.8], [5.0, 2.5, 2.0]),
+        scene::InstanceTransform {
+            translation: [-5.0, 0.4, -1.5].into(),
+            scale: glam::Vec3::splat(2.0),
+            ..Default::default()
+        },
+    );
+
+    builder.add_shape(
+        &plane,
+        material::Material::ground(util::Rgb::new(120, 204, 157)),
+        scene::InstanceTransform {
+            translation: [0.0, -0.5, 0.0].into(),
+            ..Default::default()
+        },
+    );
+
+    builder.add_shape(
+        &plane,
+        material::Material::default().with_emissive([0.75, 0.75, 0.8]),
+        scene::InstanceTransform {
+            translation: [0.0, 10.0, 0.0].into(),
             ..Default::default()
         },
     );

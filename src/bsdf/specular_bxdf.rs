@@ -13,6 +13,7 @@ impl SpecularBxdf {
 impl Bxdf for SpecularBxdf {
     fn sample(
         &self,
+        _hit_point: glam::Vec3,
         view_direction: glam::Vec3,
         _rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {

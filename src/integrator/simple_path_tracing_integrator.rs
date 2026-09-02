@@ -49,14 +49,18 @@ impl Integrator for SimplePathTracingIntegrator {
                 continue;
             }
 
-            let Some(scattering_sample) = material.bsdf.sample(view_direction, &mut rng) else {
+            let Some(scattering_sample) =
+                material
+                    .bsdf
+                    .sample(intersection.hit_point, view_direction, &mut rng)
+            else {
                 break;
             };
-            let light_direction = scattering_sample.light_direction;
-            beta *= scattering_sample.bsdf * light_direction.y.abs() / scattering_sample.pdf;
+            beta *= scattering_sample.bsdf * scattering_sample.light_direction.y.abs()
+                / scattering_sample.pdf;
 
             ray.origin = intersection.hit_point;
-            ray.direction = frame.world_from_local(light_direction);
+            ray.direction = frame.world_from_local(scattering_sample.light_direction);
         }
 
         Some(PixelSample::Radiance(radiance))
