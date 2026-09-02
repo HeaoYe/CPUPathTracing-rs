@@ -43,7 +43,7 @@ impl From<glam::U8Vec3> for Rgb {
 
 impl From<Rgb> for glam::Vec3 {
     fn from(value: Rgb) -> Self {
-        glam::U8Vec3::new(value.r, value.g, value.b)
+        glam::u8vec3(value.r, value.g, value.b)
             .as_vec3()
             .div(255.0)
             .powf(2.2)
@@ -52,7 +52,7 @@ impl From<Rgb> for glam::Vec3 {
 
 impl From<Rgb> for glam::U8Vec3 {
     fn from(value: Rgb) -> Self {
-        glam::U8Vec3::new(value.r, value.g, value.b)
+        glam::u8vec3(value.r, value.g, value.b)
     }
 }
 

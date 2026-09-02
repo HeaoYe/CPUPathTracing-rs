@@ -23,8 +23,8 @@ impl Plane {
         let z_axis = x_axis.cross(y_axis).normalize();
 
         let bounds_local = Bounds::new(
-            glam::Vec3::new(-radius, -0.001, -radius),
-            glam::Vec3::new(radius, 0.001, radius),
+            glam::vec3(-radius, -0.001, -radius),
+            glam::vec3(radius, 0.001, radius),
         );
         let mut bounds = Bounds::default();
 

@@ -107,7 +107,7 @@ pub fn parse_obj(filename: impl AsRef<std::path::Path>) -> Result<ParesdObj, std
             let mut tokens = line.split_whitespace();
             match tokens.next() {
                 Some("v") => {
-                    let vertex = glam::Vec3::new(
+                    let vertex = glam::vec3(
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
@@ -116,7 +116,7 @@ pub fn parse_obj(filename: impl AsRef<std::path::Path>) -> Result<ParesdObj, std
                     vertex_seen += 1;
                 }
                 Some("vn") => {
-                    let normal = glam::Vec3::new(
+                    let normal = glam::vec3(
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),
                         tokens.next().unwrap().parse().unwrap(),

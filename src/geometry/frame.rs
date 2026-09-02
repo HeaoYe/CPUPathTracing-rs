@@ -29,7 +29,7 @@ impl Frame {
     }
 
     pub fn local_from_world(&self, direction_world: glam::Vec3) -> glam::Vec3 {
-        glam::Vec3::new(
+        glam::vec3(
             direction_world.dot(self.x_axis),
             direction_world.dot(self.y_axis),
             direction_world.dot(self.z_axis),

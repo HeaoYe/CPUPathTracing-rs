@@ -52,7 +52,7 @@
 //             if material.is_specular {
 //                 let view_direction = frame.local_from_world(-ray.direction);
 //                 light_direction =
-//                     glam::Vec3::new(-view_direction.x, view_direction.y, -view_direction.z);
+//                     glam::vec3(-view_direction.x, view_direction.y, -view_direction.z);
 //             } else {
 //                 light_direction = uniform::hemisphere(rng.uniform(), rng.uniform());
 //             }
