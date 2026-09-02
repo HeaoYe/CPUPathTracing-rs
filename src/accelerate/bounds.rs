@@ -37,7 +37,7 @@ impl Bounds {
         let near = t1.min(t2).max_element().max(t_min);
         let far = t1.max(t2).min_element().min(t_max);
 
-        near < far
+        near <= far
     }
 
     pub fn has_intersection_inv_dir(
@@ -53,7 +53,7 @@ impl Bounds {
         let near = t1.min(t2).max_element().max(t_min);
         let far = t1.max(t2).min_element().min(t_max);
 
-        near < far
+        near <= far
     }
 
     pub fn diagonal(&self) -> glam::Vec3 {

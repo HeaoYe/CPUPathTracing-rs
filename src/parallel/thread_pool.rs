@@ -252,9 +252,10 @@ impl ThreadPool {
         T: Send,
         F: Fn(usize, usize, &mut T) + Sync,
     {
-        if data.is_empty() || data.len() != width * height {
+        if data.is_empty() {
             return;
         }
+        assert_eq!(data.len(), width * height);
 
         let base_ptr = std::ptr::NonNull::new(data.as_mut_ptr()).unwrap();
         let tile_area = (width * height).div_ceil(self.workers.len() * tasks_per_worker) as f64;

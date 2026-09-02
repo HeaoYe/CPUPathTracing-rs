@@ -67,6 +67,10 @@ impl<P: Bounded + Centroid + Send> Bvh<P> {
             ordered_primitives: primitives,
         };
 
+        if bvh.ordered_primitives.is_empty() {
+            return bvh;
+        }
+
         let mut root = BvhTreeNode::Leaf(BvhTreeNodeLeaf {
             bounds: Default::default(),
             depth: 1,
@@ -349,6 +353,10 @@ impl<P> Bvh<P> {
         Intersect: Fn(&'a P, &Ray, f32, f32) -> Option<(f32, HitData)>,
         Finalize: FnOnce(HitData) -> Output,
     {
+        if self.ordered_primitives.is_empty() {
+            return None;
+        }
+
         let mut closest_hit_data = None;
 
         #[cfg(debug_assertions)]
@@ -448,6 +456,8 @@ impl<P: Shape> Shape for Bvh<P> {
 
 impl<P> Bounded for Bvh<P> {
     fn bounds(&self) -> Bounds {
-        self.flattened_nodes.first().unwrap().bounds
+        self.flattened_nodes
+            .first()
+            .map_or(Default::default(), |node| node.bounds)
     }
 }
