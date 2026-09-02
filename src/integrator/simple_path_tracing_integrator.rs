@@ -2,14 +2,14 @@ use super::Integrator;
 use crate::{
     camera::{CameraModel, PixelSample},
     geometry::Frame,
-    sample::uniform,
+    sample::importance,
     scene::{HitInfo, Scene},
     util::Rng,
 };
 
-pub struct SimpleRtIntegrator;
+pub struct SimplePathTracingIntegrator;
 
-impl Integrator for SimpleRtIntegrator {
+impl Integrator for SimplePathTracingIntegrator {
     fn integrate(
         &self,
         x: usize,
@@ -26,27 +26,24 @@ impl Integrator for SimpleRtIntegrator {
         );
         let mut beta = glam::Vec3::ONE;
         let mut radiance = glam::Vec3::ZERO;
-
-        let mut depth = 0;
+        let q = 0.9;
 
         loop {
-            depth += 1;
-            if depth > 16 {
-                break;
-            }
-
             let Some(HitInfo {
                 intersection,
                 material,
-            }) = scene.intersect(&ray, 1e-5, f32::INFINITY)
+            }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
             else {
                 break;
             };
-
             radiance += beta * material.emissive;
-            beta *= material.albedo;
 
-            ray.origin = intersection.hit_point;
+            if rng.uniform() > q {
+                break;
+            }
+
+            beta *= material.albedo / q;
+
             let frame = Frame::new(intersection.normal);
             let light_direction;
             if material.is_specular {
@@ -54,8 +51,12 @@ impl Integrator for SimpleRtIntegrator {
                 light_direction =
                     glam::Vec3::new(-view_direction.x, view_direction.y, -view_direction.z);
             } else {
-                light_direction = uniform::hemisphere(rng.uniform(), rng.uniform());
+                light_direction = importance::cosine_hemisphere(rng.uniform(), rng.uniform());
+                beta *= light_direction.y
+                    / (std::f32::consts::PI * importance::cosine_hemisphere_pdf(light_direction));
             }
+
+            ray.origin = intersection.hit_point;
             ray.direction = frame.world_from_local(light_direction);
         }
 
