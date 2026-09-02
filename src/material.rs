@@ -1,46 +1,35 @@
+use crate::bsdf::{Bsdf, DiffuseBxdf, SpecularBxdf};
+
 pub struct Material {
-    pub albedo: glam::Vec3,
-    pub is_specular: bool,
+    pub bsdf: Bsdf,
     pub emissive: glam::Vec3,
 }
 
 impl Default for Material {
     fn default() -> Self {
-        Self {
-            albedo: glam::Vec3::splat(1.0),
-            is_specular: false,
-            emissive: glam::Vec3::ZERO,
-        }
+        Self::diffuse(glam::Vec3::ONE)
     }
 }
 
 impl Material {
-    pub fn from_lambertian(albedo: impl Into<glam::Vec3>) -> Self {
-        Self::from_lambertian_emissive(albedo.into(), glam::Vec3::ZERO)
-    }
-
-    pub fn from_specular(albedo: impl Into<glam::Vec3>) -> Self {
-        Self::from_specular_emissive(albedo.into(), glam::Vec3::ZERO)
-    }
-
-    pub fn from_lambertian_emissive(
-        albedo: impl Into<glam::Vec3>,
-        emissive: impl Into<glam::Vec3>,
-    ) -> Self {
+    fn from_bsdf(bsdf: Bsdf) -> Self {
         Self {
-            albedo: albedo.into(),
-            is_specular: false,
-            emissive: emissive.into(),
+            bsdf,
+            emissive: glam::Vec3::ZERO,
         }
     }
 
-    pub fn from_specular_emissive(
-        albedo: impl Into<glam::Vec3>,
-        emissive: impl Into<glam::Vec3>,
-    ) -> Self {
+    pub fn diffuse(albedo: impl Into<glam::Vec3>) -> Self {
+        Self::from_bsdf(Bsdf::Diffuse(DiffuseBxdf::new(albedo.into())))
+    }
+
+    pub fn specular(albedo: impl Into<glam::Vec3>) -> Self {
+        Self::from_bsdf(Bsdf::Specular(SpecularBxdf::new(albedo.into())))
+    }
+
+    pub fn with_emissive(self, emissive: impl Into<glam::Vec3>) -> Self {
         Self {
-            albedo: albedo.into(),
-            is_specular: true,
+            bsdf: self.bsdf,
             emissive: emissive.into(),
         }
     }

@@ -1,8 +1,8 @@
 use super::Integrator;
 use crate::{
+    bsdf::Bxdf,
     camera::{CameraModel, PixelSample},
     geometry::Frame,
-    sample::importance,
     scene::{HitInfo, Scene},
     util::Rng,
 };
@@ -28,33 +28,32 @@ impl Integrator for SimplePathTracingIntegrator {
         let mut radiance = glam::Vec3::ZERO;
         let q = 0.9;
 
-        loop {
-            let Some(HitInfo {
-                intersection,
-                material,
-            }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
-            else {
-                break;
-            };
+        while let Some(HitInfo {
+            intersection,
+            material,
+        }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
+        {
             radiance += beta * material.emissive;
 
             if rng.uniform() > q {
                 break;
             }
 
-            beta *= material.albedo / q;
+            beta /= q;
 
             let frame = Frame::new(intersection.normal);
-            let light_direction;
-            if material.is_specular {
-                let view_direction = frame.local_from_world(-ray.direction);
-                light_direction =
-                    glam::Vec3::new(-view_direction.x, view_direction.y, -view_direction.z);
-            } else {
-                light_direction = importance::cosine_hemisphere(rng.uniform(), rng.uniform());
-                beta *= light_direction.y
-                    / (std::f32::consts::PI * importance::cosine_hemisphere_pdf(light_direction));
+            let view_direction = frame.local_from_world(-ray.direction);
+
+            if view_direction.y == 0.0 {
+                ray.origin = intersection.hit_point;
+                continue;
             }
+
+            let Some(scattering_sample) = material.bsdf.sample(view_direction, &mut rng) else {
+                break;
+            };
+            let light_direction = scattering_sample.light_direction;
+            beta *= scattering_sample.bsdf * light_direction.y.abs() / scattering_sample.pdf;
 
             ray.origin = intersection.hit_point;
             ray.direction = frame.world_from_local(light_direction);
