@@ -7,5 +7,10 @@ pub struct ScatteringSample {
 }
 
 pub trait Bxdf {
-    fn sample(&self, view_direction: glam::Vec3, rng: &mut Rng) -> Option<ScatteringSample>;
+    fn sample(
+        &self,
+        hit_point: glam::Vec3,
+        view_direction: glam::Vec3,
+        rng: &mut Rng,
+    ) -> Option<ScatteringSample>;
 }
