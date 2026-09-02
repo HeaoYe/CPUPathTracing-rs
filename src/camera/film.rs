@@ -15,7 +15,12 @@ pub enum PixelSample {
 impl Pixel {
     pub fn add_sample(&mut self, sample: PixelSample) {
         match sample {
-            PixelSample::Radiance(radiance) => self.color_sum += radiance,
+            PixelSample::Radiance(radiance) => {
+                if radiance.is_nan() {
+                    return;
+                }
+                self.color_sum += radiance
+            }
             PixelSample::Rgb(rgb) => self.color_sum += glam::Vec3::from(rgb),
         }
         self.sample_count += 1;

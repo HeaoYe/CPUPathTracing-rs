@@ -17,8 +17,7 @@ impl Bxdf for SpecularBxdf {
         view_direction: glam::Vec3,
         _rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {
-        let light_direction =
-            glam::Vec3::new(-view_direction.x, view_direction.y, -view_direction.z);
+        let light_direction = glam::vec3(-view_direction.x, view_direction.y, -view_direction.z);
         let bsdf = self.albedo / light_direction.y.abs();
         Some(ScatteringSample {
             bsdf,
