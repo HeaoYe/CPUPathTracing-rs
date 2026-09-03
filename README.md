@@ -76,6 +76,27 @@ cargo build --release
 cargo run --release
 ```
 
+## 操作 Controls
+程序启动后会进入实时预览界面，可调整相机位置、视角与预览模式。
+
+| 操作 | 功能 |
+| :---: | --- |
+| <kbd>Enter</kbd> | 开始渲染 |
+| <kbd>Esc</kbd> | 退出预览，不进行渲染 |
+| <kbd>Caps Lock</kbd> | 捕获 / 释放鼠标 |
+| <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | 移动相机 |
+| <kbd>Space</kbd> / <kbd>Shift</kbd> | 相机上升 / 下降 |
+| 鼠标移动 | 调整相机视角 |
+| 鼠标滚轮 | 调整相机 FOV |
+| <kbd>Tab</kbd> | 切换预览模式 |
+| <kbd>+</kbd> / <kbd>-</kbd> | 调整预览目标 FPS，并自动改变预览分辨率 |
+
+`Tab` 可在以下预览模式之间切换：
+- 正常渲染
+- 法线可视化
+- BVH 包围盒相交测试热力图 (仅debug构建)
+- 三角形相交测试热力图 (仅debug构建)
+
 ## 参考资料 References
 - [Physically Based Rendering: From Theory to Implementation, 4th Edition](https://pbr-book.org/4ed/contents)
   Matt Pharr, Wenzel Jakob, Greg Humphreys, 2023.
