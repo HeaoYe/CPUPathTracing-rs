@@ -1,7 +1,7 @@
 use crate::{
     accelerate::{Bounds, Bvh},
     geometry::{Bounded, Centroid, Intersection, Ray, Shape},
-    light::{AreaLight, Light, UniformInfiniteLight},
+    light::{AreaLight, InfiniteLight, Light, UniformInfiniteLight},
     material::Material,
 };
 
@@ -27,7 +27,7 @@ impl InstanceTransform {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LightId(pub(crate) usize);
 
 #[derive(Clone, Copy)]
@@ -144,10 +144,9 @@ impl<'a> SceneBuilder<'a> {
     }
 
     pub fn add_uniform_infinite_light(&mut self, radiance: impl Into<glam::Vec3>) {
-        self.lights
-            .push(Light::UniformInfinite(UniformInfiniteLight::new(
-                radiance.into(),
-            )));
+        self.lights.push(Light::Infinite(InfiniteLight::Uniform(
+            UniformInfiniteLight::new(radiance.into()),
+        )));
     }
 
     pub fn build(mut self) -> Scene<'a> {
@@ -219,25 +218,50 @@ impl Scene<'_> {
         )
     }
 
-    pub fn lights(&self) -> &[Light] {
-        &self.lights
+    pub(crate) fn light_count(&self) -> usize {
+        self.lights.len()
     }
 
-    pub fn infinite_radiance(&self, _light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn lights(&self) -> impl Iterator<Item = (LightId, &Light)> {
+        self.lights
+            .iter()
+            .enumerate()
+            .map(|(index, light)| (LightId(index), light))
+    }
+
+    pub(crate) fn infinite_lights(&self) -> impl Iterator<Item = (LightId, &InfiniteLight)> {
+        self.lights
+            .iter()
+            .enumerate()
+            .filter_map(|(index, light)| match light {
+                Light::Infinite(light) => Some((LightId(index), light)),
+                Light::Area(_) => None,
+            })
+    }
+
+    pub(crate) fn infinite_radiance(&self, _light_direction: glam::Vec3) -> glam::Vec3 {
         self.lights
             .iter()
             .filter_map(|light| match light {
-                Light::UniformInfinite(light) => Some(light.radiance()),
+                Light::Infinite(light) => Some(light.radiance()),
                 Light::Area(_) => None,
             })
             .sum()
     }
 
-    pub fn radius(&self) -> f32 {
+    pub(crate) fn radius(&self) -> f32 {
         self.radius
     }
 
     pub(crate) fn get_shape_instance(&self, id: ShapeInstanceId) -> Option<&ShapeInstance<'_>> {
         self.bvh.get_primitive(id.0)
+    }
+
+    pub(crate) fn get_light(&self, id: LightId) -> Option<&Light> {
+        self.lights.get(id.0)
+    }
+
+    pub(crate) fn get_area_light_id(&self, id: ShapeInstanceId) -> Option<LightId> {
+        self.get_shape_instance(id)?.area_light_id
     }
 }

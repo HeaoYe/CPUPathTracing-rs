@@ -1,4 +1,4 @@
-use super::{LightSelection, LightSelector};
+use super::{LightSelection, LightSelector, MisCompensation};
 use crate::{
     light::Light,
     sample::{AliasTable, AliasTableSample},
@@ -11,15 +11,24 @@ pub struct PowerLightSelector {
 }
 
 impl LightSelector for PowerLightSelector {
-    fn new(scene: &Scene) -> Self {
-        let mut powers = Vec::with_capacity(scene.lights().len());
-        for light in scene.lights() {
+    fn new(scene: &Scene, mis_compensation: MisCompensation) -> Self {
+        let mut powers = Vec::with_capacity(scene.light_count());
+        for (_, light) in scene.lights() {
             powers.push(match light {
                 Light::Area(light) => {
                     let shape_instance = scene.get_shape_instance(light.shape_instance_id).unwrap();
                     light.power(shape_instance.shape())
                 }
-                Light::UniformInfinite(light) => light.power(scene.radius()),
+                Light::Infinite(light) => match mis_compensation {
+                    MisCompensation::Disabled => light.power(scene.radius()),
+                    MisCompensation::Enabled => {
+                        if light.skip_mis_compensation() {
+                            0.0
+                        } else {
+                            light.power(scene.radius())
+                        }
+                    }
+                },
             });
         }
         Self {
@@ -35,7 +44,7 @@ impl LightSelector for PowerLightSelector {
         })
     }
 
-    fn pmf(&self, light_source: LightId) -> f32 {
-        self.alias_table.pmf(light_source.0)
+    fn pmf(&self, light_id: LightId) -> f32 {
+        self.alias_table.pmf(light_id.0)
     }
 }

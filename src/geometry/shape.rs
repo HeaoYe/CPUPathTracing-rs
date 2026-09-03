@@ -38,5 +38,10 @@ pub struct SurfaceSample {
 
 pub trait Sampleable {
     fn area(&self) -> f32;
+
     fn sample(&self, rng: &mut Rng) -> Option<SurfaceSample>;
+
+    fn pdf(&self) -> f32 {
+        1.0 / self.area()
+    }
 }

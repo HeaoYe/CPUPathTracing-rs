@@ -10,20 +10,34 @@ pub use uniform_light_selector::UniformLightSelector;
 
 use crate::{
     light::{Light, LightSample},
-    scene::Scene,
+    scene::{LightId, Scene},
     util::Rng,
 };
+
+#[derive(Clone, Copy)]
+pub enum MisCompensation {
+    Disabled,
+    Enabled,
+}
 
 pub struct LightSampler<'a, L> {
     scene: &'a Scene<'a>,
     light_selector: L,
+    mis_compensation: MisCompensation,
+}
+
+impl<L> LightSampler<'_, L> {
+    pub fn mis_compensation(&self) -> MisCompensation {
+        self.mis_compensation
+    }
 }
 
 impl<'a, L: LightSelector> LightSampler<'a, L> {
-    pub fn new(scene: &'a Scene<'a>) -> Self {
+    pub fn new(scene: &'a Scene<'a>, mis_compensation: MisCompensation) -> Self {
         Self {
             scene,
-            light_selector: L::new(scene),
+            light_selector: L::new(scene, mis_compensation),
+            mis_compensation,
         }
     }
 }
@@ -31,7 +45,7 @@ impl<'a, L: LightSelector> LightSampler<'a, L> {
 impl<L: LightSelector> LightSampler<'_, L> {
     pub fn sample_light(&self, surface_point: glam::Vec3, rng: &mut Rng) -> Option<LightSample> {
         let light_selection = self.light_selector.sample_light_source(rng)?;
-        let light = &self.scene.lights()[light_selection.id.0];
+        let light = &self.scene.get_light(light_selection.id)?;
         let mut sample = match light {
             Light::Area(light) => {
                 let shape_instance = self
@@ -46,9 +60,35 @@ impl<L: LightSelector> LightSampler<'_, L> {
                     rng,
                 )
             }
-            Light::UniformInfinite(light) => light.sample(surface_point, self.scene.radius(), rng),
+            Light::Infinite(light) => light.sample(
+                surface_point,
+                self.scene.radius(),
+                rng,
+                self.mis_compensation,
+            ),
         }?;
         sample.pdf *= light_selection.pmf;
         Some(sample)
+    }
+
+    pub fn pdf(
+        &self,
+        light_id: LightId,
+        surface_point: glam::Vec3,
+        light_point: glam::Vec3,
+        normal: glam::Vec3,
+    ) -> f32 {
+        let light = &self.scene.get_light(light_id).unwrap();
+        let pdf = match light {
+            Light::Area(light) => {
+                let shape_instance = self
+                    .scene
+                    .get_shape_instance(light.shape_instance_id)
+                    .unwrap();
+                light.pdf(shape_instance.shape(), surface_point, light_point, normal)
+            }
+            Light::Infinite(light) => light.pdf(self.mis_compensation),
+        };
+        self.light_selector.pmf(light_id) * pdf
     }
 }

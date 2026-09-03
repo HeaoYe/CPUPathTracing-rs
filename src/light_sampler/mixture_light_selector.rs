@@ -1,4 +1,4 @@
-use super::{LightSelection, LightSelector};
+use super::{LightSelection, LightSelector, MisCompensation};
 use crate::{
     scene::{LightId, Scene},
     util::Rng,
@@ -15,11 +15,11 @@ where
     A: LightSelector,
     B: LightSelector,
 {
-    fn new(scene: &Scene) -> Self {
+    fn new(scene: &Scene, mis_compensation: MisCompensation) -> Self {
         Self {
             weight_a: PERCENT_A.min(100) as f32 / 100.0,
-            a: A::new(scene),
-            b: B::new(scene),
+            a: A::new(scene, mis_compensation),
+            b: B::new(scene, mis_compensation),
         }
     }
 
