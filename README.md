@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**19 / 25 — 多重重要性采样**
+当前进度：**20 / 25 — BVH 构建优化**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -31,7 +31,7 @@
 - [x] [Lecture17](../../tree/Lecture17) 实时预览
 - [x] [Lecture18](../../tree/Lecture18) 向光源采样
 - [x] [Lecture19](../../tree/Lecture19) 多重重要性采样
-- [ ] Lecture20 BVH 构建优化
+- [x] [Lecture20](../../tree/Lecture20) BVH 构建优化
 - [ ] Lecture21 环境光照
 - [ ] Lecture22 代码勘误和一些改进
 - [ ] Lecture23 光谱渲染（上）色彩科学
