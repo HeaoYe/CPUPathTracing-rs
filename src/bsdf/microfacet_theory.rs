@@ -20,7 +20,7 @@ impl MicrofacetTheory {
         );
         slope.x /= self.alpha_x;
         slope.y /= self.alpha_z;
-        let slope_distribution = self.slope_distribution(slope);
+        let slope_distribution = self.slope_distribution(slope) / (self.alpha_x * self.alpha_z);
         slope_distribution / microfacet_normal.y.powi(4)
     }
 
@@ -106,7 +106,7 @@ impl MicrofacetTheory {
         .normalize();
 
         let mut sample = uniform::disk(rng.uniform(), rng.uniform());
-        let h = (1.0 - sample.x * sample.x).max(0.0);
+        let h = (1.0 - sample.x * sample.x).max(0.0).sqrt();
         let t = 0.5 * (1.0 + view_direction_hemi.y);
         sample.y = t * sample.y + (1.0 - t) * h;
 

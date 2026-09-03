@@ -1,8 +1,7 @@
-use crate::bsdf::{Bsdf, ConductorBxdf, DielectricBxdf, DiffuseBxdf, GroundBxdf, SpecularBxdf};
+use crate::bsdf::{Bsdf, ConductorBsdf, DielectricBsdf, DiffuseBsdf, GroundBsdf, SpecularBsdf};
 
 pub struct Material {
     pub bsdf: Bsdf,
-    pub emissive: glam::Vec3,
 }
 
 impl Default for Material {
@@ -13,10 +12,7 @@ impl Default for Material {
 
 impl Material {
     fn from_bsdf(bsdf: Bsdf) -> Self {
-        Self {
-            bsdf,
-            emissive: glam::Vec3::ZERO,
-        }
+        Self { bsdf }
     }
 
     pub fn conductor_with_alpha(
@@ -25,7 +21,7 @@ impl Material {
         alpha_x: f32,
         alpha_z: f32,
     ) -> Self {
-        Self::from_bsdf(Bsdf::Conductor(ConductorBxdf::new(
+        Self::from_bsdf(Bsdf::Conductor(ConductorBsdf::new(
             eta.into(),
             k.into(),
             alpha_x,
@@ -44,7 +40,7 @@ impl Material {
         alpha_x: f32,
         alpha_z: f32,
     ) -> Self {
-        Self::from_bsdf(Bsdf::Dielectric(DielectricBxdf::new(
+        Self::from_bsdf(Bsdf::Dielectric(DielectricBsdf::new(
             ior,
             reflectance.into(),
             transmittance.into(),
@@ -76,21 +72,14 @@ impl Material {
     }
 
     pub fn diffuse(albedo: impl Into<glam::Vec3>) -> Self {
-        Self::from_bsdf(Bsdf::Diffuse(DiffuseBxdf::new(albedo.into())))
+        Self::from_bsdf(Bsdf::Diffuse(DiffuseBsdf::new(albedo.into())))
     }
 
     pub fn ground(albedo: impl Into<glam::Vec3>) -> Self {
-        Self::from_bsdf(Bsdf::Ground(GroundBxdf::new(albedo.into())))
+        Self::from_bsdf(Bsdf::Ground(GroundBsdf::new(albedo.into())))
     }
 
     pub fn specular(albedo: impl Into<glam::Vec3>) -> Self {
-        Self::from_bsdf(Bsdf::Specular(SpecularBxdf::new(albedo.into())))
-    }
-
-    pub fn with_emissive(self, emissive: impl Into<glam::Vec3>) -> Self {
-        Self {
-            bsdf: self.bsdf,
-            emissive: emissive.into(),
-        }
+        Self::from_bsdf(Bsdf::Specular(SpecularBsdf::new(albedo.into())))
     }
 }

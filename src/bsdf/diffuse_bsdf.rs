@@ -1,20 +1,23 @@
-use super::bxdf::{Bxdf, ScatteringSample};
+use super::ScatteringSample;
 use crate::sample::importance;
 
-pub struct DiffuseBxdf {
+pub struct DiffuseBsdf {
     albedo: glam::Vec3,
 }
 
-impl DiffuseBxdf {
+impl DiffuseBsdf {
     pub fn new(albedo: glam::Vec3) -> Self {
         Self { albedo }
     }
 }
 
-impl Bxdf for DiffuseBxdf {
-    fn sample(
+impl DiffuseBsdf {
+    pub(super) fn is_delta_distribution(&self) -> bool {
+        false
+    }
+
+    pub(super) fn sample(
         &self,
-        _hit_point: glam::Vec3,
         view_direction: glam::Vec3,
         rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {
@@ -26,5 +29,9 @@ impl Bxdf for DiffuseBxdf {
             pdf,
             light_direction: light_direction * view_direction.y.signum(),
         })
+    }
+
+    pub(super) fn bsdf(&self) -> glam::Vec3 {
+        self.albedo / std::f32::consts::PI
     }
 }

@@ -1,16 +1,13 @@
-use super::{
-    bxdf::{Bxdf, ScatteringSample},
-    microfacet_theory::MicrofacetTheory,
-};
+use super::{ScatteringSample, microfacet_theory::MicrofacetTheory};
 
-pub struct DielectricBxdf {
+pub struct DielectricBsdf {
     ior: f32,
     reflectance: glam::Vec3,
     transmittance: glam::Vec3,
     microfacet_theory: MicrofacetTheory,
 }
 
-impl DielectricBxdf {
+impl DielectricBsdf {
     pub fn new(
         ior: f32,
         reflectance: glam::Vec3,
@@ -44,10 +41,13 @@ fn fresnel(etai_div_etat: f32, cos_theta_t: f32, cos_theta_i: &mut f32) -> f32 {
     0.5 * (r_parl * r_parl + r_perp * r_perp)
 }
 
-impl Bxdf for DielectricBxdf {
-    fn sample(
+impl DielectricBsdf {
+    pub(super) fn is_delta_distribution(&self) -> bool {
+        self.ior == 1.0 || self.microfacet_theory.is_delta_distribution()
+    }
+
+    pub(super) fn sample(
         &self,
-        _hit_point: glam::Vec3,
         view_direction: glam::Vec3,
         rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {
@@ -77,7 +77,8 @@ impl Bxdf for DielectricBxdf {
         let fr = fresnel(etai_div_etat, cos_theta_t, &mut cos_theta_i);
 
         if rng.uniform() < fr {
-            let light_direction = -view_direction + 2.0 * cos_theta_i * microfacet_normal;
+            let light_direction =
+                -view_direction + 2.0 * view_direction.dot(microfacet_normal) * microfacet_normal;
             if light_direction.y * view_direction.y <= 0.0 {
                 return None;
             }
@@ -91,6 +92,7 @@ impl Bxdf for DielectricBxdf {
             }
 
             let bsdf = fr
+                * self.reflectance
                 * self
                     .microfacet_theory
                     .normal_distribution(microfacet_normal)
@@ -100,12 +102,13 @@ impl Bxdf for DielectricBxdf {
                     microfacet_normal,
                 )
                 / (4.0 * light_direction.y * view_direction.y).abs();
-            let pdf = self
-                .microfacet_theory
-                .visible_normal_distribution(view_direction, microfacet_normal)
-                / (4.0 * cos_theta_i).abs();
+            let pdf = fr
+                * self
+                    .microfacet_theory
+                    .visible_normal_distribution(view_direction, microfacet_normal)
+                / (4.0 * cos_theta_t);
             Some(ScatteringSample {
-                bsdf: glam::Vec3::splat(bsdf),
+                bsdf,
                 pdf,
                 light_direction,
             })
@@ -119,7 +122,9 @@ impl Bxdf for DielectricBxdf {
 
             if self.microfacet_theory.is_delta_distribution() {
                 return Some(ScatteringSample {
-                    bsdf: (1.0 - fr) * self.transmittance / light_direction.y.abs(),
+                    bsdf: (1.0 - fr) * self.transmittance
+                        / light_direction.y.abs()
+                        / (etai_div_etat * etai_div_etat),
                     pdf: 1.0 - fr,
                     light_direction,
                 });
@@ -139,7 +144,7 @@ impl Bxdf for DielectricBxdf {
                     microfacet_normal,
                 )
                 * cos_theta_t
-                / lv
+                / lv.abs()
                 / (etai_div_etat * etai_div_etat);
             let pdf = (1.0 - fr)
                 * self
@@ -151,6 +156,85 @@ impl Bxdf for DielectricBxdf {
                 pdf,
                 light_direction,
             })
+        }
+    }
+
+    pub(super) fn bsdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> glam::Vec3 {
+        if self.is_delta_distribution() {
+            return glam::Vec3::ZERO;
+        }
+
+        let lv = light_direction.y * view_direction.y;
+        if lv == 0.0 {
+            return glam::Vec3::ZERO;
+        }
+
+        let etai_div_etat = if view_direction.y > 0.0 {
+            self.ior
+        } else {
+            1.0 / self.ior
+        };
+
+        let mut microfacet_normal = if lv > 0.0 {
+            light_direction + view_direction
+        } else {
+            light_direction + view_direction / etai_div_etat
+        };
+
+        if microfacet_normal.length_squared() == 0.0 {
+            return glam::Vec3::ZERO;
+        }
+        if microfacet_normal.y < 0.0 {
+            microfacet_normal = -microfacet_normal;
+        }
+        if light_direction.dot(microfacet_normal) * light_direction.y <= 0.0
+            || view_direction.dot(microfacet_normal) * view_direction.y <= 0.0
+        {
+            return glam::Vec3::ZERO;
+        }
+        microfacet_normal = microfacet_normal.normalize();
+
+        let cos_theta_t = view_direction.dot(microfacet_normal).abs();
+        let mut cos_theta_i = 0.0;
+        let fr = fresnel(etai_div_etat, cos_theta_t, &mut cos_theta_i);
+
+        if lv > 0.0 {
+            fr * self.reflectance
+                * self
+                    .microfacet_theory
+                    .normal_distribution(microfacet_normal)
+                * self.microfacet_theory.height_correlated_masking_shadowing(
+                    light_direction,
+                    view_direction,
+                    microfacet_normal,
+                )
+                / (4.0 * lv)
+        } else {
+            if fr == 1.0 {
+                glam::Vec3::ZERO
+            } else {
+                let det_j = etai_div_etat * etai_div_etat * cos_theta_i.abs()
+                    / (cos_theta_t - etai_div_etat * cos_theta_i.abs()).powi(2);
+
+                (1.0 - fr)
+                    * self.transmittance
+                    * det_j
+                    * self
+                        .microfacet_theory
+                        .normal_distribution(microfacet_normal)
+                    * self.microfacet_theory.height_correlated_masking_shadowing(
+                        light_direction,
+                        view_direction,
+                        microfacet_normal,
+                    )
+                    * cos_theta_t
+                    / lv.abs()
+                    / (etai_div_etat * etai_div_etat)
+            }
         }
     }
 }
