@@ -1,10 +1,12 @@
 mod debug_integrator;
 mod normal_integrator;
+mod path_tracing_integrator;
 mod previewer;
 mod simple_path_tracing_integrator;
 
 pub use debug_integrator::{BoundsTestIntegrator, PrimitiveTestIntegrator};
 pub use normal_integrator::NormalIntegrator;
+pub use path_tracing_integrator::PathTracingIntegrator;
 pub use previewer::preview;
 pub use simple_path_tracing_integrator::SimplePathTracingIntegrator;
 

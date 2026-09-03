@@ -6,11 +6,11 @@ pub struct UniformInfiniteLight {
 }
 
 impl UniformInfiniteLight {
-    pub fn new(radiance: glam::Vec3) -> Self {
+    pub(crate) fn new(radiance: glam::Vec3) -> Self {
         Self { radiance }
     }
 
-    pub fn power(&self, scene_radius: f32) -> f32 {
+    pub(crate) fn power(&self, scene_radius: f32) -> f32 {
         4.0 * std::f32::consts::PI
             * std::f32::consts::PI
             * scene_radius
@@ -18,7 +18,7 @@ impl UniformInfiniteLight {
             * self.radiance.max_element()
     }
 
-    pub fn sample(
+    pub(crate) fn sample(
         &self,
         surface_point: glam::Vec3,
         scene_radius: f32,
@@ -33,7 +33,11 @@ impl UniformInfiniteLight {
         })
     }
 
-    pub fn radiance(&self) -> glam::Vec3 {
+    pub(crate) fn radiance(&self) -> glam::Vec3 {
         self.radiance
+    }
+
+    pub(crate) fn pdf(&self) -> f32 {
+        0.25 * std::f32::consts::FRAC_1_PI
     }
 }

@@ -12,14 +12,14 @@ pub struct PowerLightSelector {
 
 impl LightSelector for PowerLightSelector {
     fn new(scene: &Scene) -> Self {
-        let mut powers = Vec::with_capacity(scene.lights().len());
-        for light in scene.lights() {
+        let mut powers = Vec::with_capacity(scene.light_count());
+        for (_, light) in scene.lights() {
             powers.push(match light {
                 Light::Area(light) => {
                     let shape_instance = scene.get_shape_instance(light.shape_instance_id).unwrap();
                     light.power(shape_instance.shape())
                 }
-                Light::UniformInfinite(light) => light.power(scene.radius()),
+                Light::Infinite(light) => light.power(scene.radius()),
             });
         }
         Self {

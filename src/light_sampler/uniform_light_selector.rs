@@ -11,7 +11,7 @@ pub struct UniformLightSelector {
 impl LightSelector for UniformLightSelector {
     fn new(scene: &Scene) -> Self {
         Self {
-            light_count: scene.lights().len(),
+            light_count: scene.light_count(),
         }
     }
 

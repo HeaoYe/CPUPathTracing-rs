@@ -12,7 +12,7 @@ pub struct AreaLight {
 }
 
 impl AreaLight {
-    pub fn new(
+    pub(crate) fn new(
         shape_instance_id: ShapeInstanceId,
         radiance: glam::Vec3,
         double_side: bool,
@@ -24,14 +24,14 @@ impl AreaLight {
         }
     }
 
-    pub fn power(&self, shape: &dyn Sampleable) -> f32 {
+    pub(crate) fn power(&self, shape: &dyn Sampleable) -> f32 {
         (if self.double_side { 2.0 } else { 1.0 })
             * std::f32::consts::PI
             * shape.area()
             * self.radiance.max_element()
     }
 
-    pub fn sample(
+    pub(crate) fn sample(
         &self,
         surface_point: glam::Vec3,
         shape: &dyn Sampleable,
@@ -65,7 +65,7 @@ impl AreaLight {
         })
     }
 
-    pub fn radiance(
+    pub(crate) fn radiance(
         &self,
         surface_point: glam::Vec3,
         light_point: glam::Vec3,
@@ -79,5 +79,23 @@ impl AreaLight {
             return glam::Vec3::ZERO;
         }
         self.radiance
+    }
+
+    pub(crate) fn pdf(
+        &self,
+        shape: &dyn Sampleable,
+        surface_point: glam::Vec3,
+        light_point: glam::Vec3,
+        normal: glam::Vec3,
+    ) -> f32 {
+        let cos_theta = (surface_point - light_point).normalize().dot(normal);
+        if cos_theta == 0.0 {
+            return 0.0;
+        }
+        if !self.double_side && cos_theta < 0.0 {
+            return 0.0;
+        }
+        let det_j = cos_theta.abs() / (surface_point - light_point).length_squared();
+        shape.pdf() / det_j
     }
 }

@@ -25,11 +25,11 @@ impl GroundBsdf {
         let light_direction = importance::cosine_hemisphere(rng.uniform(), rng.uniform());
         let pdf = importance::cosine_hemisphere_pdf(light_direction);
         let bsdf = self.bsdf(hit_point);
-        Some(ScatteringSample {
+        Some(ScatteringSample::new(
             bsdf,
             pdf,
-            light_direction: light_direction * view_direction.y.signum(),
-        })
+            light_direction * view_direction.y.signum(),
+        ))
     }
 
     pub(super) fn bsdf(&self, hit_point: glam::Vec3) -> glam::Vec3 {
@@ -40,5 +40,13 @@ impl GroundBsdf {
             bsdf *= 0.1;
         }
         bsdf
+    }
+
+    pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {
+        if light_direction.y * view_direction.y <= 0.0 {
+            0.0
+        } else {
+            importance::cosine_hemisphere_pdf(light_direction)
+        }
     }
 }
