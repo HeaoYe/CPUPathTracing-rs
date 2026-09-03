@@ -1,12 +1,12 @@
-use cpu_path_tracing::{camera, geometry, integrator, material, scene, util};
+use cpu_path_tracing::{camera, geometry, integrator, light_sampler, material, scene, util};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let film = camera::Film::new(192 * 10, 108 * 10);
     let mut camera = camera::Camera::new(
         film,
-        glam::vec3(-3.488137, 0.184000, -2.268835),
-        glam::vec3(-4.255267, 0.356399, -1.650943),
-        68.0,
+        glam::vec3(-10.0, 1.5, 0.0),
+        glam::vec3(0.0, 0.5, 0.0),
+        45.0,
     );
 
     let model = geometry::Model::load("models/dragon_871k.obj")?;
@@ -87,26 +87,64 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    builder.add_shape(
-        &sphere,
-        material::Material::default().with_emissive([0.95 * 5.0, 0.95 * 5.0, 1.0 * 5.0]),
+    let light_sphere = geometry::Sphere {
+        center: glam::Vec3::ZERO,
+        radius: 0.5,
+    };
+    builder.add_area_light(
+        &light_sphere,
+        Default::default(),
         scene::InstanceTransform {
             translation: glam::vec3(-2.0, 6.0, 0.0),
-            scale: glam::Vec3::splat(2.0),
             ..Default::default()
         },
+        [0.95 * 100.0, 0.95 * 100.0, 1.0 * 100.0],
+        false,
     );
+    builder.add_uniform_infinite_light([0.9, 0.9, 0.7]);
 
     let scene = builder.build();
 
-    let simple_path_tracing_integrator = integrator::SimplePathTracingIntegrator;
-    if integrator::preview(&simple_path_tracing_integrator, &mut camera, &scene) {
+    let uniform_light_sampler =
+        light_sampler::LightSampler::<light_sampler::UniformLightSelector>::new(&scene);
+    let power_light_sampler =
+        light_sampler::LightSampler::<light_sampler::PowerLightSelector>::new(&scene);
+    let mixture_light_sampler = light_sampler::LightSampler::<
+        light_sampler::MixtureLightSelector<
+            20,
+            light_sampler::UniformLightSelector,
+            light_sampler::PowerLightSelector,
+        >,
+    >::new(&scene);
+
+    let simple_path_tracing_integrator_uniform =
+        integrator::SimplePathTracingIntegrator::new(&uniform_light_sampler);
+    let simple_path_tracing_integrator_power =
+        integrator::SimplePathTracingIntegrator::new(&power_light_sampler);
+    let simple_path_tracing_integrator_mixture =
+        integrator::SimplePathTracingIntegrator::new(&mixture_light_sampler);
+
+    if integrator::preview(&simple_path_tracing_integrator_uniform, &mut camera, &scene) {
         integrator::render(
-            &simple_path_tracing_integrator,
+            &simple_path_tracing_integrator_uniform,
             &mut camera,
             &scene,
-            4096,
-            "PT_microfacet_test.ppm",
+            16,
+            "PT_NEE_Uniform.ppm",
+        )?;
+        integrator::render(
+            &simple_path_tracing_integrator_power,
+            &mut camera,
+            &scene,
+            16,
+            "PT_NEE_Power.ppm",
+        )?;
+        integrator::render(
+            &simple_path_tracing_integrator_mixture,
+            &mut camera,
+            &scene,
+            16,
+            "PT_NEE_Mixture.ppm",
         )?;
     }
 

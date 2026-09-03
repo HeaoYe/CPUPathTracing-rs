@@ -1,16 +1,13 @@
-use super::{
-    bxdf::{Bxdf, ScatteringSample},
-    microfacet_theory::MicrofacetTheory,
-};
+use super::{ScatteringSample, microfacet_theory::MicrofacetTheory};
 use crate::util::Complex;
 
-pub struct ConductorBxdf {
+pub struct ConductorBsdf {
     eta: glam::Vec3,
     k: glam::Vec3,
     microfacet_theory: MicrofacetTheory,
 }
 
-impl ConductorBxdf {
+impl ConductorBsdf {
     pub fn new(eta: glam::Vec3, k: glam::Vec3, alpha_x: f32, alpha_z: f32) -> Self {
         Self {
             eta,
@@ -39,10 +36,13 @@ fn fresnel(eta: glam::Vec3, k: glam::Vec3, cos_theta_i: f32) -> glam::Vec3 {
     fr
 }
 
-impl Bxdf for ConductorBxdf {
-    fn sample(
+impl ConductorBsdf {
+    pub(super) fn is_delta_distribution(&self) -> bool {
+        self.microfacet_theory.is_delta_distribution()
+    }
+
+    pub(super) fn sample(
         &self,
-        _hit_point: glam::Vec3,
         view_direction: glam::Vec3,
         rng: &mut crate::util::Rng,
     ) -> Option<ScatteringSample> {
@@ -92,5 +92,35 @@ impl Bxdf for ConductorBxdf {
             pdf,
             light_direction,
         })
+    }
+
+    pub(super) fn bsdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> glam::Vec3 {
+        if self.is_delta_distribution() {
+            return glam::Vec3::ZERO;
+        }
+
+        if view_direction.y <= 0.0 || light_direction.y <= 0.0 {
+            return glam::Vec3::ZERO;
+        }
+
+        let mut microfacet_normal = (light_direction + view_direction).normalize();
+        if microfacet_normal.y < 0.0 {
+            microfacet_normal = -microfacet_normal;
+        }
+        let cos_theta_i = view_direction.dot(microfacet_normal).abs();
+        let fr = fresnel(self.eta, self.k, cos_theta_i);
+        fr * self
+            .microfacet_theory
+            .normal_distribution(microfacet_normal)
+            * self.microfacet_theory.height_correlated_masking_shadowing(
+                light_direction,
+                view_direction,
+                microfacet_normal,
+            )
+            / (4.0 * light_direction.y * view_direction.y)
     }
 }

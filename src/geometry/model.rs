@@ -1,7 +1,7 @@
-use super::{Bounded, Intersection, Ray, Shape, Triangle};
+use super::{Bounded, Intersection, Ray, Sampleable, Shape, SurfaceSample, Triangle};
 use crate::{
     accelerate::{Bounds, Bvh},
-    util::{parse_obj, profile},
+    util::{Rng, parse_obj, profile},
 };
 
 pub struct Model {
@@ -36,7 +36,8 @@ impl Model {
             }
         }
 
-        let bvh = Bvh::new(triangles);
+        let mut bvh = Bvh::new(triangles);
+        bvh.build_alias_table();
         Ok(Model { bvh })
     }
 }
@@ -50,5 +51,15 @@ impl Shape for Model {
 impl Bounded for Model {
     fn bounds(&self) -> Bounds {
         self.bvh.bounds()
+    }
+}
+
+impl Sampleable for Model {
+    fn area(&self) -> f32 {
+        self.bvh.area()
+    }
+
+    fn sample(&self, rng: &mut Rng) -> Option<SurfaceSample> {
+        self.bvh.sample(rng)
     }
 }

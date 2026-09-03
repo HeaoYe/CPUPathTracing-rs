@@ -58,7 +58,7 @@ impl<'a> CameraController<'a> {
         self.phi -= delta.x * self.turn_speed.x;
         self.phi = self.phi.rem_euclid(360.0);
         self.theta += delta.y * self.turn_speed.y;
-        self.theta = self.theta.clamp(-179.0, 179.0);
+        self.theta = self.theta.clamp(1.0, 179.0);
 
         let sin_theta = self.theta.to_radians().sin();
         let cos_theta = self.theta.to_radians().cos();

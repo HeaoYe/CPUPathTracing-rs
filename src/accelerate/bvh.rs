@@ -1,7 +1,9 @@
 use super::Bounds;
 use crate::{
     THREAD_POOL,
-    geometry::{Bounded, Centroid, Intersection, Ray, Shape},
+    geometry::{Bounded, Centroid, Intersection, Ray, Sampleable, Shape, SurfaceSample},
+    sample::AliasTable,
+    util::Rng,
 };
 use std::{
     ops::Range,
@@ -46,6 +48,22 @@ impl BvhState {
 pub struct Bvh<P> {
     flattened_nodes: Vec<BvhNode>,
     ordered_primitives: Vec<P>,
+    area: f32,
+    alias_table: AliasTable,
+}
+
+impl<P> Bvh<P> {
+    pub fn ordered_primitives(&self) -> &[P] {
+        &self.ordered_primitives
+    }
+
+    pub fn ordered_primitives_mut(&mut self) -> &mut [P] {
+        &mut self.ordered_primitives
+    }
+
+    pub fn get_primitive(&self, index: usize) -> Option<&P> {
+        self.ordered_primitives.get(index)
+    }
 }
 
 impl<P: Bounded> Bvh<P> {
@@ -60,11 +78,16 @@ impl<P: Bounded> Bvh<P> {
     }
 }
 
-impl<P: Bounded + Centroid + Send> Bvh<P> {
+impl<P> Bvh<P>
+where
+    P: Bounded + Centroid + Send,
+{
     pub fn new(primitives: Vec<P>) -> Self {
         let mut bvh = Self {
             flattened_nodes: Vec::new(),
             ordered_primitives: primitives,
+            area: 0.0,
+            alias_table: Default::default(),
         };
 
         if bvh.ordered_primitives.is_empty() {
@@ -459,5 +482,38 @@ impl<P> Bounded for Bvh<P> {
         self.flattened_nodes
             .first()
             .map_or(Default::default(), |node| node.bounds)
+    }
+}
+
+impl<P: Sampleable> Bvh<P> {
+    pub fn build_alias_table(&mut self) {
+        if self.ordered_primitives.is_empty() {
+            return;
+        }
+
+        let mut areas = Vec::with_capacity(self.ordered_primitives.len());
+        self.area = self.ordered_primitives.iter().fold(0.0, |acc, p| {
+            let area = p.area();
+            areas.push(area);
+            acc + area
+        });
+        self.alias_table = AliasTable::new(&areas);
+    }
+}
+
+impl<P: Sampleable> Sampleable for Bvh<P> {
+    fn area(&self) -> f32 {
+        self.area
+    }
+
+    fn sample(&self, rng: &mut Rng) -> Option<SurfaceSample> {
+        let sample = self.alias_table.sample(rng.uniform())?;
+        let primitive = &self.ordered_primitives[sample.index];
+        let surface_sample = primitive.sample(rng)?;
+        Some(SurfaceSample {
+            position: surface_sample.position,
+            normal: surface_sample.normal,
+            pdf: surface_sample.pdf * sample.pmf,
+        })
     }
 }

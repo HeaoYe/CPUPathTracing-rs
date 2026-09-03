@@ -3,6 +3,8 @@ pub mod bsdf;
 pub mod camera;
 pub mod geometry;
 pub mod integrator;
+pub mod light;
+pub mod light_sampler;
 pub mod material;
 mod parallel;
 pub mod sample;

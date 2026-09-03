@@ -1,6 +1,7 @@
 use crate::{
     accelerate::{Bounds, Bvh},
     geometry::{Bounded, Centroid, Intersection, Ray, Shape},
+    light::{AreaLight, Light, UniformInfiniteLight},
     material::Material,
 };
 
@@ -26,16 +27,28 @@ impl InstanceTransform {
     }
 }
 
-struct ShapeInstance<'a> {
+#[derive(Clone, Copy)]
+pub struct LightId(pub(crate) usize);
+
+#[derive(Clone, Copy)]
+pub struct ShapeInstanceId(usize);
+
+pub(crate) struct ShapeInstance<'a> {
     bounds: Bounds,
     shape: &'a dyn Shape,
     material: Material,
+    area_light_id: Option<LightId>,
     world_from_object: glam::Affine3A,
     object_from_world: glam::Affine3A,
 }
 
 impl<'a> ShapeInstance<'a> {
-    pub fn new<T>(shape: &'a T, material: Material, world_from_object: glam::Affine3A) -> Self
+    pub fn new<T>(
+        shape: &'a T,
+        material: Material,
+        area_light_id: Option<LightId>,
+        world_from_object: glam::Affine3A,
+    ) -> Self
     where
         T: Shape + Bounded,
     {
@@ -51,9 +64,22 @@ impl<'a> ShapeInstance<'a> {
             bounds,
             shape,
             material,
+            area_light_id,
             world_from_object,
             object_from_world: world_from_object.inverse(),
         }
+    }
+
+    pub(crate) fn shape(&self) -> &dyn Shape {
+        self.shape
+    }
+
+    pub(crate) fn world_from_object(&self) -> glam::Affine3A {
+        self.world_from_object
+    }
+
+    pub(crate) fn object_from_world(&self) -> glam::Affine3A {
+        self.object_from_world
     }
 }
 
@@ -72,10 +98,13 @@ impl Centroid for ShapeInstance<'_> {
 #[derive(Default)]
 pub struct SceneBuilder<'a> {
     instances: Vec<ShapeInstance<'a>>,
+    lights: Vec<Light>,
 }
 
 pub struct Scene<'a> {
     bvh: Bvh<ShapeInstance<'a>>,
+    lights: Vec<Light>,
+    radius: f32,
 }
 
 impl<'a> SceneBuilder<'a> {
@@ -85,12 +114,55 @@ impl<'a> SceneBuilder<'a> {
     {
         let world_from_object = transform.into_affine();
         self.instances
-            .push(ShapeInstance::new(shape, material, world_from_object));
+            .push(ShapeInstance::new(shape, material, None, world_from_object));
     }
 
-    pub fn build(self) -> Scene<'a> {
+    pub fn add_area_light<T>(
+        &mut self,
+        shape: &'a T,
+        material: Material,
+        transform: InstanceTransform,
+        radiance: impl Into<glam::Vec3>,
+        double_side: bool,
+    ) where
+        T: Shape + Bounded,
+    {
+        assert_eq!(transform.scale, glam::Vec3::ONE);
+
+        let world_from_object = transform.into_affine();
+        self.instances.push(ShapeInstance::new(
+            shape,
+            material,
+            Some(LightId(self.lights.len())),
+            world_from_object,
+        ));
+        self.lights.push(Light::Area(AreaLight::new(
+            ShapeInstanceId(usize::MAX),
+            radiance.into(),
+            double_side,
+        )));
+    }
+
+    pub fn add_uniform_infinite_light(&mut self, radiance: impl Into<glam::Vec3>) {
+        self.lights
+            .push(Light::UniformInfinite(UniformInfiniteLight::new(
+                radiance.into(),
+            )));
+    }
+
+    pub fn build(mut self) -> Scene<'a> {
+        let mut bvh = Bvh::new(self.instances);
+        for (instance_index, instance) in bvh.ordered_primitives_mut().iter().enumerate() {
+            if let Some(LightId(index)) = instance.area_light_id
+                && let Light::Area(area_light) = self.lights.get_mut(index).unwrap()
+            {
+                area_light.shape_instance_id = ShapeInstanceId(instance_index)
+            }
+        }
         Scene {
-            bvh: Bvh::new(self.instances),
+            radius: bvh.bounds().diagonal().length() * 0.5,
+            bvh,
+            lights: self.lights,
         }
     }
 }
@@ -98,6 +170,7 @@ impl<'a> SceneBuilder<'a> {
 pub struct HitInfo<'a> {
     pub intersection: Intersection,
     pub material: &'a Material,
+    pub area_light: Option<&'a AreaLight>,
 }
 
 impl Scene<'_> {
@@ -127,11 +200,44 @@ impl Scene<'_> {
                     .mul_transpose_vec3(closest_intersection.normal)
                     .normalize();
 
+                let area_light =
+                    if let Some(LightId(area_light_index)) = closest_instance.area_light_id {
+                        let Light::Area(area_light) = &self.lights[area_light_index] else {
+                            unreachable!();
+                        };
+                        Some(area_light)
+                    } else {
+                        None
+                    };
+
                 HitInfo {
                     intersection: closest_intersection,
                     material: &closest_instance.material,
+                    area_light,
                 }
             },
         )
+    }
+
+    pub fn lights(&self) -> &[Light] {
+        &self.lights
+    }
+
+    pub fn infinite_radiance(&self, _light_direction: glam::Vec3) -> glam::Vec3 {
+        self.lights
+            .iter()
+            .filter_map(|light| match light {
+                Light::UniformInfinite(light) => Some(light.radiance()),
+                Light::Area(_) => None,
+            })
+            .sum()
+    }
+
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+
+    pub(crate) fn get_shape_instance(&self, id: ShapeInstanceId) -> Option<&ShapeInstance<'_>> {
+        self.bvh.get_primitive(id.0)
     }
 }

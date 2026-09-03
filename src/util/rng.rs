@@ -1,5 +1,6 @@
 use rand::RngExt;
 use rand_pcg::Pcg32;
+use std::ops::Range;
 
 pub struct Rng {
     pcg: Pcg32,
@@ -14,5 +15,9 @@ impl Rng {
 
     pub fn uniform(&mut self) -> f32 {
         self.pcg.random()
+    }
+
+    pub fn uniform_range(&mut self, range: Range<usize>) -> usize {
+        self.pcg.random_range(range)
     }
 }

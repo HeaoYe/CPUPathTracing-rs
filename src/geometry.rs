@@ -10,6 +10,6 @@ pub use frame::Frame;
 pub use model::Model;
 pub use plane::Plane;
 pub use ray::Ray;
-pub use shape::{Bounded, Centroid, Intersection, Shape};
+pub use shape::{Bounded, Centroid, Intersection, Sampleable, Shape, SurfaceSample};
 pub use sphere::Sphere;
 pub use triangle::Triangle;
