@@ -1,0 +1,83 @@
+use super::LightSample;
+use crate::{
+    geometry::{Sampleable, SurfaceSample},
+    scene::ShapeInstanceId,
+    util::Rng,
+};
+
+pub struct AreaLight {
+    pub(crate) shape_instance_id: ShapeInstanceId,
+    radiance: glam::Vec3,
+    double_side: bool,
+}
+
+impl AreaLight {
+    pub fn new(
+        shape_instance_id: ShapeInstanceId,
+        radiance: glam::Vec3,
+        double_side: bool,
+    ) -> Self {
+        Self {
+            shape_instance_id,
+            radiance,
+            double_side,
+        }
+    }
+
+    pub fn power(&self, shape: &dyn Sampleable) -> f32 {
+        (if self.double_side { 2.0 } else { 1.0 })
+            * std::f32::consts::PI
+            * shape.area()
+            * self.radiance.max_element()
+    }
+
+    pub fn sample(
+        &self,
+        surface_point: glam::Vec3,
+        shape: &dyn Sampleable,
+        world_from_object: &glam::Affine3A,
+        object_from_world: &glam::Affine3A,
+        rng: &mut Rng,
+    ) -> Option<LightSample> {
+        let SurfaceSample {
+            position,
+            normal,
+            pdf,
+        } = shape.sample(rng)?;
+        let light_point = world_from_object.transform_point3(position);
+        let normal = object_from_world.matrix3.mul_transpose_vec3(normal);
+
+        let light_direction_raw = light_point - surface_point;
+        let light_direction = light_direction_raw.normalize();
+        let cos_theta = normal.dot(-light_direction);
+        if cos_theta == 0.0 {
+            return None;
+        }
+        if !self.double_side && cos_theta < 0.0 {
+            return None;
+        }
+        let det_j = cos_theta.abs() / light_direction_raw.length_squared();
+        Some(LightSample {
+            light_point,
+            light_direction,
+            radiance: self.radiance,
+            pdf: pdf / det_j,
+        })
+    }
+
+    pub fn radiance(
+        &self,
+        surface_point: glam::Vec3,
+        light_point: glam::Vec3,
+        normal: glam::Vec3,
+    ) -> glam::Vec3 {
+        let cos_theta_l = normal.dot(surface_point - light_point);
+        if cos_theta_l == 0.0 {
+            return glam::Vec3::ZERO;
+        }
+        if !self.double_side && cos_theta_l < 0.0 {
+            return glam::Vec3::ZERO;
+        }
+        self.radiance
+    }
+}

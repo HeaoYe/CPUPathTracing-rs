@@ -7,13 +7,13 @@ struct Item {
 
 #[derive(Default)]
 pub struct AliasTable {
-    probs: Vec<f32>,
+    pmfs: Vec<f32>,
     items: Vec<Item>,
 }
 
 pub struct AliasTableSample {
     pub index: usize,
-    pub prob: f32,
+    pub pmf: f32,
 }
 
 impl AliasTable {
@@ -23,14 +23,14 @@ impl AliasTable {
             sum += value as f64;
         }
 
-        let mut probs = vec![0.0; values.len()];
+        let mut pmfs = vec![0.0; values.len()];
         let mut items = vec![Item::default(); values.len()];
 
         let mut less = Vec::new();
         let mut greater = Vec::new();
 
         for (i, &value) in values.iter().enumerate() {
-            probs[i] = (value as f64 / sum) as f32;
+            pmfs[i] = (value as f64 / sum) as f32;
             items[i].q = 1.0;
             items[i].p = value as f64 * (items.len() as f64 / sum);
 
@@ -59,7 +59,7 @@ impl AliasTable {
             }
         }
 
-        Self { probs, items }
+        Self { pmfs, items }
     }
 
     pub fn sample(&self, u: f32) -> Option<AliasTableSample> {
@@ -73,13 +73,17 @@ impl AliasTable {
         if item.q == 1.0 || u < item.q as f32 {
             Some(AliasTableSample {
                 index: idx,
-                prob: self.probs[idx],
+                pmf: self.pmfs[idx],
             })
         } else {
             Some(AliasTableSample {
                 index: item.alias,
-                prob: self.probs[item.alias],
+                pmf: self.pmfs[item.alias],
             })
         }
+    }
+
+    pub fn pmf(&self, index: usize) -> f32 {
+        self.pmfs[index]
     }
 }

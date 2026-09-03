@@ -1,15 +1,23 @@
 use super::Integrator;
 use crate::{
-    bsdf::Bxdf,
     camera::{CameraModel, PixelSample},
-    geometry::Frame,
+    geometry::{Frame, Ray},
+    light_sampler::{LightSampler, LightSelector},
     scene::{HitInfo, Scene},
     util::Rng,
 };
 
-pub struct SimplePathTracingIntegrator;
+pub struct SimplePathTracingIntegrator<'a, L> {
+    light_sampler: &'a LightSampler<'a, L>,
+}
 
-impl Integrator for SimplePathTracingIntegrator {
+impl<'a, L> SimplePathTracingIntegrator<'a, L> {
+    pub fn new(light_sampler: &'a LightSampler<'a, L>) -> Self {
+        Self { light_sampler }
+    }
+}
+
+impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
     fn integrate(
         &self,
         x: usize,
@@ -27,13 +35,31 @@ impl Integrator for SimplePathTracingIntegrator {
         let mut beta = glam::Vec3::ONE;
         let mut radiance = glam::Vec3::ZERO;
         let q = 0.9;
+        let mut last_is_delta = true;
+        let mut last_surface_point = ray.origin;
 
-        while let Some(HitInfo {
-            intersection,
-            material,
-        }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
-        {
-            radiance += beta * material.emissive;
+        loop {
+            let Some(HitInfo {
+                intersection,
+                material,
+                area_light,
+            }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
+            else {
+                if last_is_delta {
+                    radiance += beta * scene.infinite_radiance(ray.direction);
+                }
+                break;
+            };
+
+            if last_is_delta && let Some(area_light) = area_light {
+                radiance += beta
+                    * area_light.radiance(
+                        last_surface_point,
+                        intersection.hit_point,
+                        intersection.normal,
+                    );
+            }
+            last_surface_point = intersection.hit_point;
 
             if rng.uniform() > q {
                 break;
@@ -47,6 +73,30 @@ impl Integrator for SimplePathTracingIntegrator {
             if view_direction.y == 0.0 {
                 ray.origin = intersection.hit_point;
                 continue;
+            }
+
+            last_is_delta = material.bsdf.is_delta_distribution();
+            if !last_is_delta
+                && let Some(light_sample) = self
+                    .light_sampler
+                    .sample_light(intersection.hit_point, &mut rng)
+            {
+                let shadow_ray = Ray::new(
+                    intersection.hit_point,
+                    light_sample.light_point - intersection.hit_point,
+                );
+                if scene.intersect(&shadow_ray, 1e-4, 1.0 - 1e-4).is_none() {
+                    let light_direction_local =
+                        frame.local_from_world(light_sample.light_direction);
+                    radiance +=
+                        beta * material.bsdf.bsdf(
+                            intersection.hit_point,
+                            light_direction_local,
+                            view_direction,
+                        ) * light_direction_local.y.abs()
+                            * light_sample.radiance
+                            / light_sample.pdf;
+                }
             }
 
             let Some(scattering_sample) =

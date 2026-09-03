@@ -513,7 +513,7 @@ impl<P: Sampleable> Sampleable for Bvh<P> {
         Some(SurfaceSample {
             position: surface_sample.position,
             normal: surface_sample.normal,
-            pdf: surface_sample.pdf * sample.prob,
+            pdf: surface_sample.pdf * sample.pmf,
         })
     }
 }
