@@ -1,7 +1,4 @@
-use cpu_path_tracing::{
-    camera, geometry, integrator, light_sampler, material,
-    scene::{self, InstanceTransform},
-};
+use cpu_path_tracing::{camera, geometry, integrator, light_sampler, material, scene};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let film = camera::Film::new(192 * 10, 108 * 10);
@@ -82,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 alpha,
                 alpha,
             ),
-            InstanceTransform {
+            scene::InstanceTransform {
                 translation: center,
                 rotation: glam::Quat::from_rotation_x(rotation_x),
                 ..Default::default()
@@ -96,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 alphas[i],
                 alphas[i],
             ),
-            InstanceTransform {
+            scene::InstanceTransform {
                 translation: center,
                 rotation: glam::Quat::from_rotation_x(rotation_x),
                 ..Default::default()
@@ -113,9 +110,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     builder.add_shape(
         &wall,
-        material::Material::ground(glam::Vec3::ONE),
+        material::Material::diffuse(glam::Vec3::ONE),
         Default::default(),
     );
+    builder.add_uniform_infinite_light([0.5, 0.5, 0.5]);
 
     let scene = builder.build();
 
@@ -125,14 +123,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             light_sampler::UniformLightSelector,
             light_sampler::PowerLightSelector,
         >,
-    >::new(&scene);
+    >::new(&scene, light_sampler::MisCompensation::Disabled);
+
+    let light_sampler_compensated = light_sampler::LightSampler::<
+        light_sampler::MixtureLightSelector<
+            20,
+            light_sampler::UniformLightSelector,
+            light_sampler::PowerLightSelector,
+        >,
+    >::new(&scene, light_sampler::MisCompensation::Enabled);
 
     let simple_path_tracing_integrator =
         integrator::SimplePathTracingIntegrator::new(&mixture_light_sampler);
 
     let path_tracing_integrator = integrator::PathTracingIntegrator::new(&mixture_light_sampler);
 
-    if integrator::preview(&simple_path_tracing_integrator, &mut camera, &scene) {
+    let path_tracing_integrator_compensated =
+        integrator::PathTracingIntegrator::new(&light_sampler_compensated);
+
+    if integrator::preview(&path_tracing_integrator_compensated, &mut camera, &scene) {
         integrator::render(
             &simple_path_tracing_integrator,
             &mut camera,
@@ -146,6 +155,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &scene,
             64,
             "PT_MIS.ppm",
+        )?;
+        integrator::render(
+            &path_tracing_integrator_compensated,
+            &mut camera,
+            &scene,
+            64,
+            "PT_MIS_COMPENSATION.ppm",
         )?;
     }
 

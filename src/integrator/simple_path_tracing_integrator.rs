@@ -2,7 +2,7 @@ use super::Integrator;
 use crate::{
     camera::{CameraModel, PixelSample},
     geometry::{Frame, Ray},
-    light_sampler::{LightSampler, LightSelector},
+    light_sampler::{LightSampler, LightSelector, MisCompensation},
     scene::{HitInfo, Scene},
     util::Rng,
 };
@@ -13,6 +13,9 @@ pub struct SimplePathTracingIntegrator<'a, L> {
 
 impl<'a, L> SimplePathTracingIntegrator<'a, L> {
     pub fn new(light_sampler: &'a LightSampler<'a, L>) -> Self {
+        if let MisCompensation::Enabled = light_sampler.mis_compensation() {
+            panic!("SimplePathTracingIntegrator doesn't support MIS Compensation")
+        }
         Self { light_sampler }
     }
 }

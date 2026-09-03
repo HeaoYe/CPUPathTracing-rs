@@ -1,5 +1,5 @@
 use super::LightSample;
-use crate::sample::uniform;
+use crate::{light_sampler::MisCompensation, sample::uniform};
 
 pub struct UniformInfiniteLight {
     radiance: glam::Vec3,
@@ -18,26 +18,39 @@ impl UniformInfiniteLight {
             * self.radiance.max_element()
     }
 
+    pub(crate) fn skip_mis_compensation(&self) -> bool {
+        true
+    }
+
     pub(crate) fn sample(
         &self,
         surface_point: glam::Vec3,
         scene_radius: f32,
         rng: &mut crate::util::Rng,
+        mis_compensation: MisCompensation,
     ) -> Option<LightSample> {
-        let light_direction = uniform::sphere(rng.uniform(), rng.uniform());
-        Some(LightSample {
-            light_point: surface_point + 2.0 * scene_radius * light_direction,
-            light_direction,
-            radiance: self.radiance,
-            pdf: 0.25 * std::f32::consts::FRAC_1_PI,
-        })
+        match mis_compensation {
+            MisCompensation::Disabled => {
+                let light_direction = uniform::sphere(rng.uniform(), rng.uniform());
+                Some(LightSample {
+                    light_point: surface_point + 2.0 * scene_radius * light_direction,
+                    light_direction,
+                    radiance: self.radiance,
+                    pdf: 0.25 * std::f32::consts::FRAC_1_PI,
+                })
+            }
+            MisCompensation::Enabled => None,
+        }
     }
 
     pub(crate) fn radiance(&self) -> glam::Vec3 {
         self.radiance
     }
 
-    pub(crate) fn pdf(&self) -> f32 {
-        0.25 * std::f32::consts::FRAC_1_PI
+    pub(crate) fn pdf(&self, mis_compensation: MisCompensation) -> f32 {
+        match mis_compensation {
+            MisCompensation::Disabled => 0.25 * std::f32::consts::FRAC_1_PI,
+            MisCompensation::Enabled => 0.0,
+        }
     }
 }

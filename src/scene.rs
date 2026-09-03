@@ -27,7 +27,7 @@ impl InstanceTransform {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LightId(pub(crate) usize);
 
 #[derive(Clone, Copy)]

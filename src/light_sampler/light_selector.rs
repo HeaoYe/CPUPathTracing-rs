@@ -1,3 +1,4 @@
+use super::MisCompensation;
 use crate::{
     scene::{LightId, Scene},
     util::Rng,
@@ -9,9 +10,9 @@ pub struct LightSelection {
 }
 
 pub trait LightSelector {
-    fn new(scene: &Scene) -> Self;
+    fn new(scene: &Scene, mis_compensation: MisCompensation) -> Self;
 
     fn sample_light_source(&self, rng: &mut Rng) -> Option<LightSelection>;
 
-    fn pmf(&self, light_source: LightId) -> f32;
+    fn pmf(&self, light_id: LightId) -> f32;
 }
