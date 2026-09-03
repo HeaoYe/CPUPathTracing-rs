@@ -1,14 +1,13 @@
-use super::{Intersection, Ray, Shape};
-use crate::{
-    accelerate::Bounds,
-    geometry::{Bounded, Centroid},
-};
+use super::{Bounded, Centroid, Intersection, Ray, Sampleable, Shape, SurfaceSample};
+use crate::{accelerate::Bounds, sample::uniform, util::Rng};
 
 pub struct Plane {
     point: glam::Vec3,
     normal: glam::Vec3,
     radius: f32,
     bounds: Bounds,
+    x_axis: glam::Vec3,
+    z_axis: glam::Vec3,
 }
 
 impl Plane {
@@ -43,6 +42,8 @@ impl Plane {
             normal,
             radius,
             bounds,
+            x_axis,
+            z_axis,
         }
     }
 }
@@ -72,5 +73,21 @@ impl Bounded for Plane {
 impl Centroid for Plane {
     fn centroid(&self) -> glam::Vec3 {
         self.point
+    }
+}
+
+impl Sampleable for Plane {
+    fn area(&self) -> f32 {
+        std::f32::consts::PI * self.radius * self.radius
+    }
+
+    fn sample(&self, rng: &mut Rng) -> Option<SurfaceSample> {
+        let position = uniform::disk(rng.uniform(), rng.uniform()) * self.radius;
+        let position = self.point + position.x * self.x_axis + position.y * self.z_axis;
+        Some(SurfaceSample {
+            position,
+            normal: self.normal,
+            pdf: 1.0 / self.area(),
+        })
     }
 }

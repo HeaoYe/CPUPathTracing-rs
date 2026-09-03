@@ -1,5 +1,5 @@
-use super::{Bounded, Centroid, Intersection, Ray, Shape};
-use crate::accelerate::Bounds;
+use super::{Bounded, Centroid, Intersection, Ray, Sampleable, Shape, SurfaceSample};
+use crate::{accelerate::Bounds, sample::uniform};
 
 pub struct Sphere {
     pub center: glam::Vec3,
@@ -43,5 +43,20 @@ impl Bounded for Sphere {
 impl Centroid for Sphere {
     fn centroid(&self) -> glam::Vec3 {
         self.center
+    }
+}
+
+impl Sampleable for Sphere {
+    fn area(&self) -> f32 {
+        4.0 * std::f32::consts::PI * self.radius * self.radius
+    }
+
+    fn sample(&self, rng: &mut crate::util::Rng) -> Option<SurfaceSample> {
+        let normal = uniform::sphere(rng.uniform(), rng.uniform());
+        Some(SurfaceSample {
+            position: self.center + normal * self.radius,
+            normal,
+            pdf: 1.0 / self.area(),
+        })
     }
 }

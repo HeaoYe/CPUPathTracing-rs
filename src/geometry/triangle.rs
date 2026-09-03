@@ -1,4 +1,4 @@
-use super::{Bounded, Centroid, Intersection, Ray, Shape};
+use super::{Bounded, Centroid, Intersection, Ray, Sampleable, Shape, SurfaceSample};
 use crate::accelerate::Bounds;
 
 pub struct Triangle {
@@ -67,5 +67,28 @@ impl Bounded for Triangle {
 impl Centroid for Triangle {
     fn centroid(&self) -> glam::Vec3 {
         (self.p0 + self.p1 + self.p2) / 3.0
+    }
+}
+
+impl Sampleable for Triangle {
+    fn area(&self) -> f32 {
+        0.5 * (self.p2 - self.p1).cross(self.p1 - self.p0).length()
+    }
+
+    fn sample(&self, rng: &mut crate::util::Rng) -> Option<SurfaceSample> {
+        let mut u = rng.uniform();
+        let mut v = rng.uniform();
+        if u > v {
+            v *= 0.5;
+            u -= v;
+        } else {
+            u *= 0.5;
+            v -= u;
+        }
+        Some(SurfaceSample {
+            position: u * self.p0 + v * self.p1 + (1.0 - u - v) * self.p2,
+            normal: (u * self.n0 + v * self.n1 + (1.0 - u - v) * self.n2).normalize(),
+            pdf: 1.0 / self.area(),
+        })
     }
 }
