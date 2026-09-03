@@ -95,8 +95,8 @@ impl Bsdf {
         match self {
             Self::Conductor(bxdf) => bxdf.bsdf(light_direction, view_direction),
             Self::Dielectric(bxdf) => bxdf.bsdf(light_direction, view_direction),
-            Self::Diffuse(bxdf) => bxdf.bsdf(),
-            Self::Ground(bxdf) => bxdf.bsdf(hit_point),
+            Self::Diffuse(bxdf) => bxdf.bsdf(light_direction, view_direction),
+            Self::Ground(bxdf) => bxdf.bsdf(hit_point, light_direction, view_direction),
             Self::Specular(bxdf) => bxdf.bsdf(),
         }
     }

@@ -31,8 +31,16 @@ impl DiffuseBsdf {
         ))
     }
 
-    pub(super) fn bsdf(&self) -> glam::Vec3 {
-        self.albedo / std::f32::consts::PI
+    pub(super) fn bsdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> glam::Vec3 {
+        if light_direction.y * view_direction.y <= 0.0 {
+            glam::Vec3::ZERO
+        } else {
+            self.albedo / std::f32::consts::PI
+        }
     }
 
     pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {

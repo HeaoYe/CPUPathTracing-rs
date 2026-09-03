@@ -24,7 +24,7 @@ impl GroundBsdf {
     ) -> Option<ScatteringSample> {
         let light_direction = importance::cosine_hemisphere(rng.uniform(), rng.uniform());
         let pdf = importance::cosine_hemisphere_pdf(light_direction);
-        let bsdf = self.bsdf(hit_point);
+        let bsdf = self.bsdf(hit_point, light_direction, view_direction);
         Some(ScatteringSample::new(
             bsdf,
             pdf,
@@ -32,14 +32,23 @@ impl GroundBsdf {
         ))
     }
 
-    pub(super) fn bsdf(&self, hit_point: glam::Vec3) -> glam::Vec3 {
-        let mut bsdf = self.albedo / std::f32::consts::PI;
-        if ((hit_point.x * 8.0 + 0.5).floor() as i32) % 8 == 0
-            || ((hit_point.z * 8.0 + 0.5).floor() as i32) % 8 == 0
-        {
-            bsdf *= 0.1;
+    pub(super) fn bsdf(
+        &self,
+        hit_point: glam::Vec3,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> glam::Vec3 {
+        if light_direction.y * view_direction.y <= 0.0 {
+            glam::Vec3::ZERO
+        } else {
+            let mut bsdf = self.albedo / std::f32::consts::PI;
+            if ((hit_point.x * 8.0 + 0.5).floor() as i32) % 8 == 0
+                || ((hit_point.z * 8.0 + 0.5).floor() as i32) % 8 == 0
+            {
+                bsdf *= 0.1;
+            }
+            bsdf
         }
-        bsdf
     }
 
     pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {

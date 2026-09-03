@@ -22,6 +22,12 @@ impl AliasTable {
         for &value in values {
             sum += value as f64;
         }
+        if sum == 0.0 {
+            return Self {
+                pmfs: vec![],
+                items: vec![],
+            };
+        }
 
         let mut pmfs = vec![0.0; values.len()];
         let mut items = vec![Item::default(); values.len()];
@@ -84,6 +90,9 @@ impl AliasTable {
     }
 
     pub fn pmf(&self, index: usize) -> f32 {
+        if self.items.is_empty() {
+            return 0.0;
+        }
         self.pmfs[index]
     }
 }
