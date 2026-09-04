@@ -15,14 +15,14 @@ use crate::spectrum::{SpectrumSample, WavelengthSample};
 
 pub struct ScatteringSample {
     pub bsdf: SpectrumSample,
-    pub pdf: f32,
+    pub pdf: SpectrumSample,
     pub light_direction: glam::Vec3,
     pub eta_scale: SpectrumSample,
     pub dispersive_refraction: bool,
 }
 
 impl ScatteringSample {
-    pub fn new(bsdf: SpectrumSample, pdf: f32, light_direction: glam::Vec3) -> Self {
+    pub fn new(bsdf: SpectrumSample, pdf: SpectrumSample, light_direction: glam::Vec3) -> Self {
         Self {
             bsdf,
             pdf,
@@ -79,7 +79,7 @@ impl Bsdf<'_> {
         }?;
 
         if scattering_sample.bsdf == SpectrumSample::ZERO
-            || scattering_sample.pdf == 0.0
+            || scattering_sample.pdf[0] == 0.0
             || scattering_sample.light_direction.y == 0.0
         {
             None
@@ -109,7 +109,7 @@ impl Bsdf<'_> {
         light_direction: glam::Vec3,
         view_direction: glam::Vec3,
         wavelength: &WavelengthSample,
-    ) -> f32 {
+    ) -> SpectrumSample {
         match self {
             Self::Conductor(bxdf) => bxdf.pdf(light_direction, view_direction),
             Self::Dielectric(bxdf) => bxdf.pdf(light_direction, view_direction, wavelength),

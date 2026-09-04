@@ -11,7 +11,7 @@ pub use uniform_light_selector::UniformLightSelector;
 use crate::{
     light::{Light, LightSample},
     scene::{LightId, Scene},
-    spectrum::WavelengthSample,
+    spectrum::{SpectrumSample, WavelengthSample},
     util::Rng,
 };
 
@@ -85,7 +85,7 @@ impl<L: LightSelector> LightSampler<'_, L> {
         surface_point: glam::Vec3,
         light_point: glam::Vec3,
         normal: glam::Vec3,
-    ) -> f32 {
+    ) -> SpectrumSample {
         let light = &self.scene.get_light(light_id).unwrap();
         let pdf = match light {
             Light::Area(light) => {
@@ -100,6 +100,6 @@ impl<L: LightSelector> LightSampler<'_, L> {
                 self.mis_compensation,
             ),
         };
-        self.light_selector.pmf(light_id) * pdf
+        SpectrumSample::splat(self.light_selector.pmf(light_id)) * pdf
     }
 }

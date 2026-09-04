@@ -77,7 +77,7 @@ impl ConductorBsdf<'_> {
         if self.microfacet_theory.is_delta_distribution() {
             return Some(ScatteringSample::new(
                 fr / light_direction.y.abs(),
-                1.0,
+                SpectrumSample::ONE,
                 light_direction,
             ));
         }
@@ -96,7 +96,11 @@ impl ConductorBsdf<'_> {
             .microfacet_theory
             .visible_normal_distribution(view_direction, microfacet_normal)
             / (4.0 * cos_theta_i).abs();
-        Some(ScatteringSample::new(bsdf, pdf, light_direction))
+        Some(ScatteringSample::new(
+            bsdf,
+            SpectrumSample::splat(pdf),
+            light_direction,
+        ))
     }
 
     pub(super) fn bsdf(
@@ -134,21 +138,27 @@ impl ConductorBsdf<'_> {
             / (4.0 * light_direction.y * view_direction.y)
     }
 
-    pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {
+    pub(super) fn pdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> SpectrumSample {
         if self.is_delta_distribution() {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
 
         if view_direction.y <= 0.0 || light_direction.y <= 0.0 {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
 
         let mut microfacet_normal = (light_direction + view_direction).normalize();
         if microfacet_normal.y < 0.0 {
             microfacet_normal = -microfacet_normal;
         }
-        self.microfacet_theory
-            .visible_normal_distribution(view_direction, microfacet_normal)
-            / (4.0 * view_direction.dot(microfacet_normal).abs())
+        SpectrumSample::splat(
+            self.microfacet_theory
+                .visible_normal_distribution(view_direction, microfacet_normal)
+                / (4.0 * view_direction.dot(microfacet_normal).abs()),
+        )
     }
 }

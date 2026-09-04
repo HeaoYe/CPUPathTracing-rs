@@ -32,7 +32,7 @@ impl GroundBsdf<'_> {
         let bsdf = self.bsdf(hit_point, light_direction, view_direction, wavelength);
         Some(ScatteringSample::new(
             bsdf,
-            pdf,
+            SpectrumSample::splat(pdf),
             light_direction * view_direction.y.signum(),
         ))
     }
@@ -57,11 +57,15 @@ impl GroundBsdf<'_> {
         }
     }
 
-    pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {
+    pub(super) fn pdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> SpectrumSample {
         if light_direction.y * view_direction.y <= 0.0 {
-            0.0
+            SpectrumSample::ZERO
         } else {
-            importance::cosine_hemisphere_pdf(light_direction)
+            SpectrumSample::splat(importance::cosine_hemisphere_pdf(light_direction))
         }
     }
 }

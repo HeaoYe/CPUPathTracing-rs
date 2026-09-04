@@ -86,7 +86,7 @@ impl DielectricBsdf<'_> {
         if self.ior.is_constant() && self.ior.max() == 1.0 {
             return Some(ScatteringSample::new(
                 self.transmittance.sample(wavelength) / view_direction.y.abs(),
-                1.0,
+                SpectrumSample::ONE,
                 -view_direction,
             ));
         }
@@ -118,7 +118,7 @@ impl DielectricBsdf<'_> {
             if self.microfacet_theory.is_delta_distribution() {
                 return Some(ScatteringSample::new(
                     fr * self.reflectance.sample(wavelength) / light_direction.y.abs(),
-                    fr[0],
+                    fr,
                     light_direction,
                 ));
             }
@@ -134,7 +134,7 @@ impl DielectricBsdf<'_> {
                     microfacet_normal,
                 )
                 / (4.0 * light_direction.y * view_direction.y).abs();
-            let pdf = fr[0]
+            let pdf = fr
                 * self
                     .microfacet_theory
                     .visible_normal_distribution(view_direction, microfacet_normal)
@@ -157,7 +157,7 @@ impl DielectricBsdf<'_> {
                             (SpectrumSample::ONE - fr) * self.transmittance.sample(wavelength)
                                 / light_direction.y.abs()
                                 / eta_scale,
-                            1.0 - fr[0],
+                            SpectrumSample::splat(1.0 - fr[0]),
                             light_direction,
                         )
                         .with_eta_scale(eta_scale),
@@ -167,8 +167,10 @@ impl DielectricBsdf<'_> {
                 bsdf[0] = (1.0 - fr[0]) * self.transmittance.eval(wavelength.lambda(0))
                     / light_direction.y.abs()
                     / eta_scale[0];
+                let mut pdf = SpectrumSample::ZERO;
+                pdf[0] = 1.0 - fr[0];
                 return Some(
-                    ScatteringSample::new(bsdf, 1.0 - fr[0], light_direction)
+                    ScatteringSample::new(bsdf, pdf, light_direction)
                         .with_eta_scale(eta_scale)
                         .with_dispersive_refraction(),
                 );
@@ -245,7 +247,8 @@ impl DielectricBsdf<'_> {
         for i in 0..WAVELENGTH_SAMPLE_COUNT {
             let mut microfacet_normal = light_direction + view_direction / etai_div_etat[i];
             if microfacet_normal.length_squared() == 0.0 {
-                return SpectrumSample::ZERO;
+                bsdf[i] = 0.0;
+                continue;
             }
             if microfacet_normal.y < 0.0 {
                 microfacet_normal = -microfacet_normal;
@@ -253,7 +256,8 @@ impl DielectricBsdf<'_> {
             if light_direction.dot(microfacet_normal) * light_direction.y <= 0.0
                 || view_direction.dot(microfacet_normal) * view_direction.y <= 0.0
             {
-                return SpectrumSample::ZERO;
+                bsdf[i] = 0.0;
+                continue;
             }
             microfacet_normal = microfacet_normal.normalize();
 
@@ -290,62 +294,80 @@ impl DielectricBsdf<'_> {
         light_direction: glam::Vec3,
         view_direction: glam::Vec3,
         wavelength: &WavelengthSample,
-    ) -> f32 {
+    ) -> SpectrumSample {
         if self.is_delta_distribution() {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
 
         let lv = light_direction.y * view_direction.y;
         if lv == 0.0 {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
 
         let etai_div_etat = if view_direction.y > 0.0 {
-            self.ior.eval(wavelength.lambda(0))
+            self.ior.sample(wavelength)
         } else {
-            1.0 / self.ior.eval(wavelength.lambda(0))
+            SpectrumSample::ONE / self.ior.sample(wavelength)
         };
-
-        let mut microfacet_normal = if lv > 0.0 {
-            light_direction + view_direction
-        } else {
-            light_direction + view_direction / etai_div_etat
-        };
-
-        if microfacet_normal.length_squared() == 0.0 {
-            return 0.0;
-        }
-        if microfacet_normal.y < 0.0 {
-            microfacet_normal = -microfacet_normal;
-        }
-        if light_direction.dot(microfacet_normal) * light_direction.y <= 0.0
-            || view_direction.dot(microfacet_normal) * view_direction.y <= 0.0
-        {
-            return 0.0;
-        }
-        microfacet_normal = microfacet_normal.normalize();
-
-        let cos_theta_t = view_direction.dot(microfacet_normal).abs();
-        let mut cos_theta_i = 0.0;
-        let fr = fresnel(etai_div_etat, cos_theta_t, &mut cos_theta_i);
 
         if lv > 0.0 {
-            fr * self
-                .microfacet_theory
-                .visible_normal_distribution(view_direction, microfacet_normal)
-                / (4.0 * cos_theta_t)
-        } else {
-            if fr == 1.0 {
-                0.0
-            } else {
-                let det_j = etai_div_etat * etai_div_etat * cos_theta_i.abs()
-                    / (cos_theta_t - etai_div_etat * cos_theta_i.abs()).powi(2);
-                (1.0 - fr)
-                    * self
-                        .microfacet_theory
-                        .visible_normal_distribution(view_direction, microfacet_normal)
-                    * det_j
+            let mut microfacet_normal = light_direction + view_direction;
+            if microfacet_normal.length_squared() == 0.0 {
+                return SpectrumSample::ZERO;
             }
+            if microfacet_normal.y < 0.0 {
+                microfacet_normal = -microfacet_normal;
+            }
+            if light_direction.dot(microfacet_normal) * light_direction.y <= 0.0
+                || view_direction.dot(microfacet_normal) * view_direction.y <= 0.0
+            {
+                return SpectrumSample::ZERO;
+            }
+            microfacet_normal = microfacet_normal.normalize();
+
+            let cos_theta_t = view_direction.dot(microfacet_normal).abs();
+            let mut cos_theta_i = SpectrumSample::ZERO;
+            let fr = fresnel_spectrum(etai_div_etat, cos_theta_t, &mut cos_theta_i);
+
+            return fr
+                * self
+                    .microfacet_theory
+                    .visible_normal_distribution(view_direction, microfacet_normal)
+                / (4.0 * cos_theta_t);
         }
+
+        let mut pdf = SpectrumSample::ZERO;
+        for i in 0..WAVELENGTH_SAMPLE_COUNT {
+            let mut microfacet_normal = light_direction + view_direction / etai_div_etat[i];
+            if microfacet_normal.length_squared() == 0.0 {
+                continue;
+            }
+            if microfacet_normal.y < 0.0 {
+                microfacet_normal = -microfacet_normal;
+            }
+            if light_direction.dot(microfacet_normal) * light_direction.y <= 0.0
+                || view_direction.dot(microfacet_normal) * view_direction.y <= 0.0
+            {
+                continue;
+            }
+            microfacet_normal = microfacet_normal.normalize();
+
+            let cos_theta_t = view_direction.dot(microfacet_normal).abs();
+            let mut cos_theta_i = 0.0;
+            let fr = fresnel(etai_div_etat[i], cos_theta_t, &mut cos_theta_i);
+            if fr == 1.0 {
+                continue;
+            }
+
+            let det_j = etai_div_etat[i] * etai_div_etat[i] * cos_theta_i.abs()
+                / (cos_theta_t - etai_div_etat[i] * cos_theta_i.abs()).powi(2);
+            pdf[i] = (1.0 - fr)
+                * self
+                    .microfacet_theory
+                    .visible_normal_distribution(view_direction, microfacet_normal)
+                * det_j;
+        }
+
+        pdf
     }
 }

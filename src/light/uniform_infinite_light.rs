@@ -41,7 +41,7 @@ impl<'a> UniformInfiniteLight<'a> {
                     light_point: surface_point + 2.0 * scene_radius * light_direction,
                     light_direction,
                     radiance: self.radiance.sample(wavelength),
-                    pdf: 0.25 * std::f32::consts::FRAC_1_PI,
+                    pdf: SpectrumSample::splat(0.25 * std::f32::consts::FRAC_1_PI),
                 })
             }
             MisCompensation::Enabled => None,
@@ -52,10 +52,10 @@ impl<'a> UniformInfiniteLight<'a> {
         self.radiance.sample(wavelength)
     }
 
-    pub(crate) fn pdf(&self, mis_compensation: MisCompensation) -> f32 {
+    pub(crate) fn pdf(&self, mis_compensation: MisCompensation) -> SpectrumSample {
         match mis_compensation {
-            MisCompensation::Disabled => 0.25 * std::f32::consts::FRAC_1_PI,
-            MisCompensation::Enabled => 0.0,
+            MisCompensation::Disabled => SpectrumSample::splat(0.25 * std::f32::consts::FRAC_1_PI),
+            MisCompensation::Enabled => SpectrumSample::ZERO,
         }
     }
 }

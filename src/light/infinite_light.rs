@@ -59,7 +59,7 @@ impl<'a> InfiniteLight<'a> {
         &self,
         light_direction: glam::Vec3,
         mis_compensation: MisCompensation,
-    ) -> f32 {
+    ) -> SpectrumSample {
         match self {
             Self::Uniform(light) => light.pdf(mis_compensation),
             Self::Image(light) => light.pdf(light_direction, mis_compensation),

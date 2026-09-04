@@ -105,7 +105,7 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
                             &wavelength,
                         ) * light_direction_local.y.abs()
                             * light_sample.radiance
-                            / light_sample.pdf;
+                            / light_sample.pdf[0];
                 }
             }
 
@@ -123,7 +123,7 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
             }
 
             beta *= scattering_sample.bsdf * scattering_sample.light_direction.y.abs()
-                / scattering_sample.pdf;
+                / scattering_sample.pdf[0];
 
             ray.origin = intersection.hit_point;
             ray.direction = frame.world_from_local(scattering_sample.light_direction);

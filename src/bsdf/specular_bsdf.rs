@@ -24,14 +24,18 @@ impl SpecularBsdf<'_> {
     ) -> Option<ScatteringSample> {
         let light_direction = glam::vec3(-view_direction.x, view_direction.y, -view_direction.z);
         let bsdf = self.albedo.sample(wavelength) / light_direction.y.abs();
-        Some(ScatteringSample::new(bsdf, 1.0, light_direction))
+        Some(ScatteringSample::new(
+            bsdf,
+            SpectrumSample::ONE,
+            light_direction,
+        ))
     }
 
     pub(super) fn bsdf(&self) -> SpectrumSample {
         SpectrumSample::ZERO
     }
 
-    pub(super) fn pdf(&self) -> f32 {
-        0.0
+    pub(super) fn pdf(&self) -> SpectrumSample {
+        SpectrumSample::ZERO
     }
 }

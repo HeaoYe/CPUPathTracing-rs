@@ -31,7 +31,7 @@ impl DiffuseBsdf<'_> {
         let bsdf = self.albedo.sample(wavelength) / std::f32::consts::PI;
         Some(ScatteringSample::new(
             bsdf,
-            pdf,
+            SpectrumSample::splat(pdf),
             light_direction * view_direction.y.signum(),
         ))
     }
@@ -49,11 +49,15 @@ impl DiffuseBsdf<'_> {
         }
     }
 
-    pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {
+    pub(super) fn pdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> SpectrumSample {
         if light_direction.y * view_direction.y <= 0.0 {
-            0.0
+            SpectrumSample::ZERO
         } else {
-            importance::cosine_hemisphere_pdf(light_direction)
+            SpectrumSample::splat(importance::cosine_hemisphere_pdf(light_direction))
         }
     }
 }

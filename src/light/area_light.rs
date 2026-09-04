@@ -63,7 +63,7 @@ impl<'a> AreaLight<'a> {
             light_point,
             light_direction,
             radiance: self.radiance.sample(wavelength),
-            pdf: pdf / det_j,
+            pdf: SpectrumSample::splat(pdf / det_j),
         })
     }
 
@@ -90,15 +90,15 @@ impl<'a> AreaLight<'a> {
         surface_point: glam::Vec3,
         light_point: glam::Vec3,
         normal: glam::Vec3,
-    ) -> f32 {
+    ) -> SpectrumSample {
         let cos_theta = (surface_point - light_point).normalize().dot(normal);
         if cos_theta == 0.0 {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
         if !self.double_side && cos_theta < 0.0 {
-            return 0.0;
+            return SpectrumSample::ZERO;
         }
         let det_j = cos_theta.abs() / (surface_point - light_point).length_squared();
-        shape.pdf() / det_j
+        SpectrumSample::splat(shape.pdf() / det_j)
     }
 }

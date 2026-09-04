@@ -303,7 +303,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             16,
-            "SPECTRAL_TEST_16.exr",
+            "SPECTRAL_MIS_TEST_16.exr",
             &color::SRGB,
         )?;
         integrator::render(
@@ -311,7 +311,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             16,
-            "SPECTRAL_TEST_SIMPLE_16.exr",
+            "SPECTRAL_MIS_TEST_SIMPLE_16.exr",
             &color::SRGB,
         )?;
         integrator::render(
@@ -319,7 +319,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             64,
-            "SPECTRAL_TEST_64.exr",
+            "SPECTRAL_MIS_TEST_64.exr",
             &color::SRGB,
         )?;
         integrator::render(
@@ -327,7 +327,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             64,
-            "SPECTRAL_TEST_SIMPLE_64.exr",
+            "SPECTRAL_MIS_TEST_SIMPLE_64.exr",
             &color::SRGB,
         )?;
     }

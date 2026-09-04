@@ -14,7 +14,7 @@ pub struct LightSample {
     pub light_point: glam::Vec3,
     pub light_direction: glam::Vec3,
     pub radiance: SpectrumSample,
-    pub pdf: f32,
+    pub pdf: SpectrumSample,
 }
 
 pub enum Light<'a> {
