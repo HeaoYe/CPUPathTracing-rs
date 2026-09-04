@@ -1,5 +1,4 @@
-use crate::{THREAD_POOL, util::Rgb};
-use std::io::Write;
+use crate::{THREAD_POOL, image::RgbImage, util::Rgb};
 
 #[derive(Default, Clone)]
 pub struct Pixel {
@@ -63,17 +62,12 @@ impl Film {
     }
 
     pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        let mut file = std::fs::File::create(filename)?;
-        let mut buffer = vec![[0u8; 3]; self.width * self.height];
-        file.write_all(format!("P6\n{} {}\n255\n", self.width, self.height).as_bytes())?;
-
+        let mut buffer = vec![glam::Vec3::ZERO; self.width * self.height];
         THREAD_POOL.parallel_for_2d_coarse(self.width, self.height, &mut buffer, |x, y, pixel| {
-            let rgb = Rgb::from(self.pixels[y * self.width + x].average());
-            *pixel = rgb.to_array();
+            *pixel = self.pixels[y * self.width + x].average();
         });
-        file.write_all(buffer.as_flattened())?;
-
-        Ok(())
+        let image = RgbImage::new(self.width, self.height, buffer);
+        image.save(filename)
     }
 
     pub fn clear(&mut self) {

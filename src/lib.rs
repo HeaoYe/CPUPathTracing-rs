@@ -2,6 +2,7 @@ pub mod accelerate;
 pub mod bsdf;
 pub mod camera;
 pub mod geometry;
+pub mod image;
 pub mod integrator;
 pub mod light;
 pub mod light_sampler;

@@ -9,6 +9,7 @@ rand = "0.10"
 rand_pcg = "0.10"
 winit = "0.30"
 softbuffer = "0.4"
+exr = "1.74"
 
 [profile.dev]
 opt-level = 1

@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             64,
-            "PT_MIS.ppm",
+            "PT_MIS.exr",
         )?;
     }
 
