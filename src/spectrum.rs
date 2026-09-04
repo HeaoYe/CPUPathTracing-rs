@@ -6,6 +6,7 @@ mod densely_sampled_spectrum;
 mod illuminant;
 mod illuminant_spectrum;
 mod piecewise_linear_spectrum;
+mod spectrum_sample;
 mod wavelength;
 
 pub use analytic_spectrum::AnalyticSpectrum;
@@ -18,9 +19,11 @@ pub use illuminant::{
 };
 pub use illuminant_spectrum::IlluminantSpectrum;
 pub use piecewise_linear_spectrum::{PiecewiseLinearSpectrum, SamplePoint};
-pub use wavelength::{LAMBDA_MAX, LAMBDA_MIN};
+pub use spectrum_sample::SpectrumSample;
+pub use wavelength::{LAMBDA_MAX, LAMBDA_MIN, WAVELENGTH_SAMPLE_COUNT, WavelengthSample};
 
 pub enum Spectrum<'a> {
+    Default,
     Constant(ConstantSpectrum),
     Dense(DenselySampledSpectrum),
     PiecewiseLinear(PiecewiseLinearSpectrum),
@@ -30,11 +33,20 @@ pub enum Spectrum<'a> {
 }
 
 impl Spectrum<'_> {
+    pub fn sample(&self, wavelength: &WavelengthSample) -> SpectrumSample {
+        SpectrumSample::from_array(std::array::from_fn(|i| self.eval(wavelength.lambda(i))))
+    }
+
+    pub fn is_constant(&self) -> bool {
+        matches!(self, Self::Default | Self::Constant(_))
+    }
+
     pub fn eval(&self, lambda: f32) -> f32 {
         if lambda < LAMBDA_MIN as f32 || lambda > LAMBDA_MAX as f32 {
             0.0
         } else {
             match self {
+                Self::Default => 1.0,
                 Self::Constant(spectrum) => spectrum.eval(),
                 Self::Dense(spectrum) => spectrum.eval(lambda),
                 Self::PiecewiseLinear(spectrum) => spectrum.eval(lambda),
@@ -47,6 +59,7 @@ impl Spectrum<'_> {
 
     pub fn max(&self) -> f32 {
         match self {
+            Self::Default => 1.0,
             Self::Constant(spectrum) => spectrum.max(),
             Self::Dense(spectrum) => spectrum.max(),
             Self::PiecewiseLinear(spectrum) => spectrum.max(),
@@ -80,8 +93,86 @@ impl<'a> Spectrum<'a> {
         ))
     }
 
+    pub fn dense_from_csv(
+        filename: impl AsRef<std::path::Path>,
+        header_name_lambda: &str,
+        header_name_value: &str,
+    ) -> Result<Self, std::io::Error> {
+        use crate::util;
+        use std::io::{Error, ErrorKind};
+
+        let mut reader = csv::Reader::from_path(filename)?;
+        let headers = reader.headers()?;
+
+        let lambda_index = util::csv_column(headers, header_name_lambda)?;
+        let value_index = util::csv_column(headers, header_name_value)?;
+
+        let mut values = Vec::new();
+        let mut lambda_min = None;
+        let mut lambda_max = None;
+
+        for record in reader.records() {
+            let record = record?;
+            let lambda = util::parse_csv::<u32>(&record[lambda_index])?;
+            let value = util::parse_csv::<f32>(&record[value_index])?;
+
+            lambda_min.get_or_insert(lambda);
+            lambda_max = Some(lambda);
+            values.push(value);
+        }
+
+        let lambda_min = lambda_min.ok_or_else(|| {
+            Error::new(ErrorKind::InvalidData, "CSV contains no spectrum samples")
+        })?;
+
+        let lambda_max = lambda_max.unwrap();
+
+        Ok(Self::Dense(DenselySampledSpectrum::from_values(
+            values, lambda_min, lambda_max,
+        )))
+    }
+
     pub fn piecewise_linear_from_samples(samples: impl Into<Vec<SamplePoint>>) -> Self {
         Self::PiecewiseLinear(PiecewiseLinearSpectrum::from_samples(samples.into()))
+    }
+
+    pub fn piecewise_linear_from_csv(
+        filename: impl AsRef<std::path::Path>,
+        header_name_lambda: &str,
+        lambda_scale: f32,
+        header_name_value: &str,
+    ) -> Result<Self, std::io::Error> {
+        use crate::util;
+        use std::io::{Error, ErrorKind};
+
+        let mut reader = csv::Reader::from_path(filename)?;
+        let headers = reader.headers()?;
+
+        let lambda_index = util::csv_column(headers, header_name_lambda)?;
+        let value_index = util::csv_column(headers, header_name_value)?;
+
+        let mut lambdas = Vec::new();
+        let mut values = Vec::new();
+
+        for record in reader.records() {
+            let record = record?;
+            let lambda = util::parse_csv::<f32>(&record[lambda_index])?;
+            let value = util::parse_csv::<f32>(&record[value_index])?;
+
+            lambdas.push(lambda * lambda_scale);
+            values.push(value);
+        }
+
+        if lambdas.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "CSV contains no spectrum samples",
+            ));
+        }
+
+        Ok(Self::PiecewiseLinear(PiecewiseLinearSpectrum::from_values(
+            lambdas, values,
+        )))
     }
 
     pub fn piecewise_linear_from_values(

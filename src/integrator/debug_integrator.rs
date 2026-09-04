@@ -1,6 +1,7 @@
 use super::Integrator;
 use crate::{
     camera::{CameraModel, PixelSample},
+    color::ColorSpace,
     scene::Scene,
 };
 
@@ -8,17 +9,18 @@ pub struct BoundsTestIntegrator;
 pub struct PrimitiveTestIntegrator;
 
 impl Integrator for BoundsTestIntegrator {
-    fn integrate(
+    fn integrate<'a>(
         &self,
         _x: usize,
         _y: usize,
         _sample_index: usize,
         _camera: &CameraModel,
         _scene: &Scene,
-    ) -> Option<PixelSample<'_>> {
+        _target_color_space: &'a ColorSpace,
+    ) -> Option<PixelSample<'a>> {
         #[cfg(debug_assertions)]
         {
-            use crate::color::{EncodedRgb, SRGB};
+            use crate::color::EncodedRgb;
             let ray = _camera.generate_ray(
                 glam::IVec2::new(_x as i32, _y as i32),
                 glam::Vec2::splat(0.5),
@@ -28,7 +30,7 @@ impl Integrator for BoundsTestIntegrator {
                 EncodedRgb::generate_heatmap(
                     ray.debug_info.borrow().bounds_test_count as f32 / 150.0,
                 ),
-                &SRGB,
+                _target_color_space,
             ));
         }
         #[cfg(not(debug_assertions))]
@@ -39,17 +41,18 @@ impl Integrator for BoundsTestIntegrator {
 }
 
 impl Integrator for PrimitiveTestIntegrator {
-    fn integrate(
+    fn integrate<'a>(
         &self,
         _x: usize,
         _y: usize,
         _sample_index: usize,
         _camera: &CameraModel,
         _scene: &Scene,
-    ) -> Option<PixelSample<'_>> {
+        _target_color_space: &'a ColorSpace,
+    ) -> Option<PixelSample<'a>> {
         #[cfg(debug_assertions)]
         {
-            use crate::color::{EncodedRgb, SRGB};
+            use crate::color::EncodedRgb;
             let ray = _camera.generate_ray(
                 glam::IVec2::new(_x as i32, _y as i32),
                 glam::Vec2::splat(0.5),
@@ -59,7 +62,7 @@ impl Integrator for PrimitiveTestIntegrator {
                 EncodedRgb::generate_heatmap(
                     ray.debug_info.borrow().primitive_test_count as f32 / 14.0,
                 ),
-                &SRGB,
+                _target_color_space,
             ));
         }
         #[cfg(not(debug_assertions))]

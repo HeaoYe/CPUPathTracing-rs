@@ -1,6 +1,6 @@
 use super::Xyz;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Chromaticity {
     x: f32,
     y: f32,

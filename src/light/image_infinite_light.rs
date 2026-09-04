@@ -1,5 +1,10 @@
 use super::LightSample;
-use crate::{image::RgbImage, light_sampler::MisCompensation, sample::AliasTable};
+use crate::{
+    image::RgbImage,
+    light_sampler::MisCompensation,
+    sample::AliasTable,
+    spectrum::{SpectrumSample, WavelengthSample},
+};
 
 pub struct ImageInfiniteLight<'a> {
     image: &'a RgbImage<'a>,
@@ -100,29 +105,37 @@ impl<'a> ImageInfiniteLight<'a> {
             Some(LightSample {
                 light_point: surface_point + 2.0 * scene_radius * light_direction,
                 light_direction,
-                radiance: self
-                    .image
-                    .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-                    .as_vec3(),
-                pdf: sample.pmf * self.image.width() as f32 * self.image.height() as f32
-                    / (2.0
-                        * std::f32::consts::PI
-                        * std::f32::consts::PI
-                        * (1.0 - light_direction.y * light_direction.y).sqrt()
-                        * w
-                        * h),
+                // radiance: self
+                //     .image
+                //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+                //     .as_vec3(),
+                radiance: SpectrumSample::ZERO, // INCOMPLETED
+                pdf: SpectrumSample::splat(
+                    sample.pmf * self.image.width() as f32 * self.image.height() as f32
+                        / (2.0
+                            * std::f32::consts::PI
+                            * std::f32::consts::PI
+                            * (1.0 - light_direction.y * light_direction.y).sqrt()
+                            * w
+                            * h),
+                ),
             })
         }
     }
 
-    pub(crate) fn radiance(&self, light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn radiance(
+        &self,
+        light_direction: glam::Vec3,
+        _wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         if light_direction.y.abs() >= 1.0 {
-            glam::Vec3::ZERO
+            SpectrumSample::ZERO
         } else {
-            let image_point = self.image_point_from_direction(light_direction);
-            self.image
-                .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-                .as_vec3()
+            let _image_point = self.image_point_from_direction(light_direction);
+            // self.image
+            //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+            //     .as_vec3()
+            SpectrumSample::ZERO // INCOMPLETED
         }
     }
 
@@ -130,9 +143,9 @@ impl<'a> ImageInfiniteLight<'a> {
         &self,
         light_direction: glam::Vec3,
         mis_compensation: MisCompensation,
-    ) -> f32 {
+    ) -> SpectrumSample {
         if light_direction.y.abs() >= 1.0 {
-            0.0
+            SpectrumSample::ZERO
         } else {
             let image_point = self.image_point_from_direction(light_direction);
             let gird_idx = self.gird_idx_from_image_point(image_point);
@@ -141,13 +154,15 @@ impl<'a> ImageInfiniteLight<'a> {
             let gird_pmf = self
                 .choose_alias_table(mis_compensation)
                 .pmf(gird_idx.y * self.gird_count.x + gird_idx.x);
-            gird_pmf * self.image.width() as f32 * self.image.height() as f32
-                / (2.0
-                    * std::f32::consts::PI
-                    * std::f32::consts::PI
-                    * (1.0 - light_direction.y * light_direction.y).sqrt()
-                    * w
-                    * h)
+            SpectrumSample::splat(
+                gird_pmf * self.image.width() as f32 * self.image.height() as f32
+                    / (2.0
+                        * std::f32::consts::PI
+                        * std::f32::consts::PI
+                        * (1.0 - light_direction.y * light_direction.y).sqrt()
+                        * w
+                        * h),
+            )
         }
     }
 

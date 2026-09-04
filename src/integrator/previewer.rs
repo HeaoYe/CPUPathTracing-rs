@@ -151,7 +151,8 @@ where
             self.controller.camera.film.as_slice_mut(),
             move |x, y, pixel| {
                 for i in 1..=spp {
-                    if let Some(sample) = integrator.integrate(x, y, current_spp + i, camera, scene)
+                    if let Some(sample) =
+                        integrator.integrate(x, y, current_spp + i, camera, scene, &SRGB)
                     {
                         pixel.add_sample(sample);
                     }

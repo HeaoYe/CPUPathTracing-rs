@@ -4,6 +4,7 @@ use crate::{
     image::RgbImage,
     light::{AreaLight, ImageInfiniteLight, InfiniteLight, Light, UniformInfiniteLight},
     material::Material,
+    spectrum::{Spectrum, SpectrumSample, WavelengthSample},
 };
 
 pub struct InstanceTransform {
@@ -37,7 +38,7 @@ pub struct ShapeInstanceId(usize);
 pub(crate) struct ShapeInstance<'a> {
     bounds: Bounds,
     shape: &'a dyn Shape,
-    material: Material,
+    material: Material<'a>,
     area_light_id: Option<LightId>,
     world_from_object: glam::Affine3A,
     object_from_world: glam::Affine3A,
@@ -46,7 +47,7 @@ pub(crate) struct ShapeInstance<'a> {
 impl<'a> ShapeInstance<'a> {
     pub fn new<T>(
         shape: &'a T,
-        material: Material,
+        material: Material<'a>,
         area_light_id: Option<LightId>,
         world_from_object: glam::Affine3A,
     ) -> Self
@@ -109,8 +110,12 @@ pub struct Scene<'a> {
 }
 
 impl<'a> SceneBuilder<'a> {
-    pub fn add_shape<T>(&mut self, shape: &'a T, material: Material, transform: InstanceTransform)
-    where
+    pub fn add_shape<T>(
+        &mut self,
+        shape: &'a T,
+        material: Material<'a>,
+        transform: InstanceTransform,
+    ) where
         T: Shape + Bounded,
     {
         let world_from_object = transform.into_affine();
@@ -121,9 +126,9 @@ impl<'a> SceneBuilder<'a> {
     pub fn add_area_light<T>(
         &mut self,
         shape: &'a T,
-        material: Material,
+        material: Material<'a>,
         transform: InstanceTransform,
-        radiance: impl Into<glam::Vec3>,
+        radiance: &'a Spectrum<'a>,
         double_side: bool,
     ) where
         T: Shape + Bounded,
@@ -139,14 +144,14 @@ impl<'a> SceneBuilder<'a> {
         ));
         self.lights.push(Light::Area(AreaLight::new(
             ShapeInstanceId(usize::MAX),
-            radiance.into(),
+            radiance,
             double_side,
         )));
     }
 
-    pub fn add_uniform_infinite_light(&mut self, radiance: impl Into<glam::Vec3>) {
+    pub fn add_uniform_infinite_light(&mut self, radiance: &'a Spectrum<'a>) {
         self.lights.push(Light::Infinite(InfiniteLight::Uniform(
-            UniformInfiniteLight::new(radiance.into()),
+            UniformInfiniteLight::new(radiance),
         )));
     }
 
@@ -176,8 +181,8 @@ impl<'a> SceneBuilder<'a> {
 
 pub struct HitInfo<'a> {
     pub intersection: Intersection,
-    pub material: &'a Material,
-    pub area_light: Option<&'a AreaLight>,
+    pub material: &'a Material<'a>,
+    pub area_light: Option<&'a AreaLight<'a>>,
 }
 
 impl Scene<'_> {
@@ -247,11 +252,15 @@ impl Scene<'_> {
             })
     }
 
-    pub(crate) fn infinite_radiance(&self, light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn infinite_radiance(
+        &self,
+        light_direction: glam::Vec3,
+        wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         self.lights
             .iter()
             .filter_map(|light| match light {
-                Light::Infinite(light) => Some(light.radiance(light_direction)),
+                Light::Infinite(light) => Some(light.radiance(light_direction, wavelength)),
                 Light::Area(_) => None,
             })
             .sum()

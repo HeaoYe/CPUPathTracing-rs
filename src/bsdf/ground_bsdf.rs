@@ -1,17 +1,21 @@
 use super::ScatteringSample;
-use crate::sample::importance;
+use crate::{
+    sample::importance,
+    spectrum::{Spectrum, SpectrumSample, WavelengthSample},
+};
 
-pub struct GroundBsdf {
-    albedo: glam::Vec3,
+#[derive(Clone, Copy)]
+pub struct GroundBsdf<'a> {
+    albedo: &'a Spectrum<'a>,
 }
 
-impl GroundBsdf {
-    pub fn new(albedo: glam::Vec3) -> Self {
+impl<'a> GroundBsdf<'a> {
+    pub fn new(albedo: &'a Spectrum<'a>) -> Self {
         Self { albedo }
     }
 }
 
-impl GroundBsdf {
+impl GroundBsdf<'_> {
     pub(super) fn is_delta_distribution(&self) -> bool {
         false
     }
@@ -21,13 +25,14 @@ impl GroundBsdf {
         hit_point: glam::Vec3,
         view_direction: glam::Vec3,
         rng: &mut crate::util::Rng,
+        wavelength: &WavelengthSample,
     ) -> Option<ScatteringSample> {
         let light_direction = importance::cosine_hemisphere(rng.uniform(), rng.uniform());
         let pdf = importance::cosine_hemisphere_pdf(light_direction);
-        let bsdf = self.bsdf(hit_point, light_direction, view_direction);
+        let bsdf = self.bsdf(hit_point, light_direction, view_direction, wavelength);
         Some(ScatteringSample::new(
             bsdf,
-            pdf,
+            SpectrumSample::splat(pdf),
             light_direction * view_direction.y.signum(),
         ))
     }
@@ -37,11 +42,12 @@ impl GroundBsdf {
         hit_point: glam::Vec3,
         light_direction: glam::Vec3,
         view_direction: glam::Vec3,
-    ) -> glam::Vec3 {
+        wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         if light_direction.y * view_direction.y <= 0.0 {
-            glam::Vec3::ZERO
+            SpectrumSample::ZERO
         } else {
-            let mut bsdf = self.albedo / std::f32::consts::PI;
+            let mut bsdf = self.albedo.sample(wavelength) / std::f32::consts::PI;
             if ((hit_point.x * 8.0 + 0.5).floor() as i32) % 8 == 0
                 || ((hit_point.z * 8.0 + 0.5).floor() as i32) % 8 == 0
             {
@@ -51,11 +57,15 @@ impl GroundBsdf {
         }
     }
 
-    pub(super) fn pdf(&self, light_direction: glam::Vec3, view_direction: glam::Vec3) -> f32 {
+    pub(super) fn pdf(
+        &self,
+        light_direction: glam::Vec3,
+        view_direction: glam::Vec3,
+    ) -> SpectrumSample {
         if light_direction.y * view_direction.y <= 0.0 {
-            0.0
+            SpectrumSample::ZERO
         } else {
-            importance::cosine_hemisphere_pdf(light_direction)
+            SpectrumSample::splat(importance::cosine_hemisphere_pdf(light_direction))
         }
     }
 }

@@ -1,124 +1,289 @@
 use cpu_path_tracing::{
-    camera, color, geometry, image, integrator, light_sampler, material, scene, spectrum,
+    camera, color, geometry, integrator, light_sampler, material, scene, spectrum,
 };
 
+fn rgb_spectrum<'a>(r: u8, g: u8, b: u8) -> spectrum::Spectrum<'a> {
+    let data = color::SRGB.decode(color::EncodedRgb::from_quantized(
+        r as u32, g as u32, b as u32, 8,
+    ));
+    spectrum::Spectrum::piecewise_linear_from_samples([
+        spectrum::SamplePoint {
+            lambda: 360.0,
+            value: data.b() / 3.0,
+        },
+        spectrum::SamplePoint {
+            lambda: 400.0,
+            value: data.b(),
+        },
+        spectrum::SamplePoint {
+            lambda: 525.0,
+            value: data.g(),
+        },
+        spectrum::SamplePoint {
+            lambda: 650.0,
+            value: data.r(),
+        },
+        spectrum::SamplePoint {
+            lambda: 830.0,
+            value: data.r() / 3.0,
+        },
+    ])
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let eew = spectrum::Spectrum::constant(1.0);
-    let xyz_eew = color::Xyz::from_spectrum(&eew);
-    println!("EEW XYZ: {:?}", xyz_eew);
-
-    let xyz_d65 = color::Xyz::from_spectrum(&spectrum::CIE_STD_ILLUMNT_D65);
-    let chroma_d65 = color::Chromaticity::from(xyz_d65);
-    println!("D65 Chroma: {:?}", chroma_d65);
-
-    let blackbody_6504k = spectrum::Spectrum::blackbody(6504.0);
-    let chroma_6504k = color::Chromaticity::from(color::Xyz::from_spectrum(&blackbody_6504k));
-    println!("6504k Chroma: {:?}", chroma_6504k);
-
-    let rgb_d65_srgb = color::SRGB.rgb_from_xyz(xyz_d65);
-    let rgb_d65_dci_p3 = color::DCI_P3.rgb_from_xyz(xyz_d65);
-    println!("sRGB D65: {:?}", rgb_d65_srgb);
-    println!("DCI-P3 D65: {:?}", rgb_d65_dci_p3);
-
-    let d65_600nit = spectrum::Spectrum::illuminant(&spectrum::CIE_STD_ILLUMNT_D65, 600.0);
-    let rgb_d65_600nit_srgb = color::SRGB.rgb_from_xyz(color::Xyz::from_spectrum(&d65_600nit));
-    println!("sRGB D65 600nit: {:?}", rgb_d65_600nit_srgb);
-
-    let encoded_rgb_d65_600nit_srgb = color::SRGB.encode(rgb_d65_600nit_srgb);
-    println!(
-        "sRGB D65 600nit: {:?}",
-        encoded_rgb_d65_600nit_srgb.to_quantized(8)
-    );
-
     let film = camera::Film::new(192 * 10, 108 * 10);
     let mut camera = camera::Camera::new(
         film,
-        glam::vec3(0.0, 1.25, -6.0),
-        glam::vec3(0.0, 1.95, 0.0),
-        45.0,
+        glam::vec3(0.0, 4.0, -8.0),
+        glam::vec3(0.0, 2.1, 0.2),
+        48.0,
     );
 
     let mut builder = scene::SceneBuilder::default();
 
-    let model = geometry::Model::load("models/buddha.obj")?;
+    let buddha = geometry::Model::load("models/buddha.obj")?;
+    let dragon = geometry::Model::load("models/dragon_871k.obj")?;
 
-    let rgb = |r: u8, g: u8, b: u8| {
-        color::SRGB.decode(color::EncodedRgb::from_quantized(
-            r as u32, g as u32, b as u32, 8,
-        ))
-    };
+    let copper_eta = spectrum::Spectrum::piecewise_linear_from_csv(
+        "spectrums/Johnson-copper.csv",
+        "wl",
+        1e3,
+        "n",
+    )?;
+    let copper_k = spectrum::Spectrum::piecewise_linear_from_csv(
+        "spectrums/Johnson-copper.csv",
+        "wl",
+        1e3,
+        "k",
+    )?;
+    let copper = material::Material::conductor_with_alpha(&copper_eta, &copper_k, 0.5, 0.42);
+    let glass_eta = spectrum::Spectrum::piecewise_linear_from_csv(
+        "spectrums/Zelmon-glass.csv",
+        "wl",
+        1e3,
+        "n",
+    )?;
+    let glass_albedo = rgb_spectrum(210, 210, 184);
+    let glass = material::Material::dielectric_with_alpha(
+        &glass_eta,
+        &glass_albedo,
+        &glass_albedo,
+        0.21,
+        0.08,
+    );
+
     builder.add_shape(
-        &model,
-        material::Material::specular(rgb(241, 191, 79)),
+        &buddha,
+        copper,
         scene::InstanceTransform {
-            translation: glam::vec3(-3.0, 1.75, 0.0),
-            scale: glam::vec3(4.0, 4.0, 4.0),
+            translation: glam::vec3(-5.0, 1.78, 1.7),
+            scale: glam::Vec3::splat(4.0),
             ..Default::default()
         },
     );
     builder.add_shape(
-        &model,
-        material::Material::conductor_with_alpha([1.2, 1.2, 5.3], [3.4, 3.4, 2.1], 0.8, 0.2),
+        &buddha,
+        glass,
         scene::InstanceTransform {
-            translation: glam::vec3(-1.0, 1.75, 0.0),
-            scale: glam::vec3(4.0, 4.0, 4.0),
+            translation: glam::vec3(-2.1, 1.78, 1.7),
+            scale: glam::Vec3::splat(4.0),
             ..Default::default()
         },
     );
     builder.add_shape(
-        &model,
-        material::Material::dielectric_with_alpha(
-            1.4,
-            glam::Vec3::ONE,
-            rgb(180, 180, 154),
-            0.1,
-            0.3,
-        ),
+        &buddha,
+        glass,
         scene::InstanceTransform {
-            translation: glam::vec3(1.0, 1.75, 0.0),
-            scale: glam::vec3(4.0, 4.0, 4.0),
+            translation: glam::vec3(2.1, 1.78, 1.7),
+            scale: glam::Vec3::splat(4.0),
             ..Default::default()
         },
     );
     builder.add_shape(
-        &model,
-        material::Material::diffuse(rgb(241, 191, 79)),
+        &buddha,
+        copper,
         scene::InstanceTransform {
-            translation: glam::vec3(3.0, 1.75, 0.0),
-            scale: glam::vec3(4.0, 4.0, 4.0),
+            translation: glam::vec3(5.0, 1.78, 1.7),
+            scale: glam::Vec3::splat(4.0),
             ..Default::default()
         },
     );
 
     let sphere = geometry::Sphere {
         center: glam::Vec3::ZERO,
-        radius: 1.0,
+        radius: 0.45,
     };
+    let sphere_eta = spectrum::Spectrum::piecewise_linear_from_samples([
+        spectrum::SamplePoint {
+            lambda: 360.0,
+            value: 1.60,
+        },
+        spectrum::SamplePoint {
+            lambda: 400.0,
+            value: 1.57,
+        },
+        spectrum::SamplePoint {
+            lambda: 525.0,
+            value: 1.52,
+        },
+        spectrum::SamplePoint {
+            lambda: 650.0,
+            value: 1.48,
+        },
+        spectrum::SamplePoint {
+            lambda: 830.0,
+            value: 1.45,
+        },
+    ]);
+    let sphere_mat = material::Material::dielectric_with_alpha_tint(
+        &sphere_eta,
+        &spectrum::Spectrum::Default,
+        0.0,
+        0.0,
+    );
+
     builder.add_shape(
         &sphere,
-        material::Material::specular(glam::Vec3::ONE),
+        sphere_mat,
         scene::InstanceTransform {
-            translation: glam::vec3(0.0, 3.75, 3.0),
+            translation: glam::vec3(-1.0, 0.55, -1.65),
             ..Default::default()
         },
+    );
+    builder.add_shape(
+        &sphere,
+        sphere_mat,
+        scene::InstanceTransform {
+            translation: glam::vec3(1.0, 0.55, -1.65),
+            ..Default::default()
+        },
+    );
+
+    let metameric_a_reflectance = spectrum::Spectrum::dense_from_csv(
+        "spectrums/Metameric_A_reflectance.csv",
+        "wavelength_nm",
+        "reflectance",
+    )?;
+    let metameric_a = material::Material::diffuse(&metameric_a_reflectance);
+    let metameric_b_reflectance = spectrum::Spectrum::dense_from_csv(
+        "spectrums/Metameric_B_reflectance.csv",
+        "wavelength_nm",
+        "reflectance",
+    )?;
+    let metameric_b = material::Material::diffuse(&metameric_b_reflectance);
+
+    builder.add_shape(
+        &dragon,
+        metameric_a,
+        scene::InstanceTransform {
+            translation: glam::vec3(-4.3, 0.7, -1.65),
+            scale: glam::Vec3::splat(2.0),
+            rotation: glam::Quat::from_rotation_y((-90.0_f32).to_radians()),
+        },
+    );
+    builder.add_shape(
+        &dragon,
+        metameric_b,
+        scene::InstanceTransform {
+            translation: glam::vec3(-2.4, 0.7, -1.65),
+            scale: glam::Vec3::splat(2.0),
+            rotation: glam::Quat::from_rotation_y((-90.0_f32).to_radians()),
+        },
+    );
+    builder.add_shape(
+        &dragon,
+        metameric_b,
+        scene::InstanceTransform {
+            translation: glam::vec3(2.4, 0.7, -1.65),
+            scale: glam::Vec3::splat(2.0),
+            rotation: glam::Quat::from_rotation_y(90.0_f32.to_radians()),
+        },
+    );
+    builder.add_shape(
+        &dragon,
+        metameric_a,
+        scene::InstanceTransform {
+            translation: glam::vec3(4.3, 0.7, -1.65),
+            scale: glam::Vec3::splat(2.0),
+            rotation: glam::Quat::from_rotation_y(90.0_f32.to_radians()),
+        },
+    );
+
+    let vertices = [
+        glam::vec3(-2.4, 0.0, -1.3),
+        glam::vec3(-2.4, 0.0, 1.3),
+        glam::vec3(2.4, 0.0, -1.3),
+        glam::vec3(2.4, 0.0, 1.3),
+    ];
+    let light_triangle_1 = geometry::Triangle::from_points(vertices[0], vertices[2], vertices[1]);
+    let light_triangle_2 = geometry::Triangle::from_points(vertices[1], vertices[2], vertices[3]);
+
+    let illuminant_d65 = spectrum::Spectrum::illuminant(&spectrum::CIE_STD_ILLUMNT_D65, 2400.0);
+    let illuminant_a = spectrum::Spectrum::illuminant(&spectrum::CIE_STD_ILLUMNT_A, 2400.0);
+
+    builder.add_area_light(
+        &light_triangle_1,
+        Default::default(),
+        scene::InstanceTransform {
+            translation: glam::vec3(-3.6, 5.2, 1.1),
+            ..Default::default()
+        },
+        &illuminant_d65,
+        false,
+    );
+    builder.add_area_light(
+        &light_triangle_2,
+        Default::default(),
+        scene::InstanceTransform {
+            translation: glam::vec3(-3.6, 5.2, 1.1),
+            ..Default::default()
+        },
+        &illuminant_d65,
+        false,
+    );
+    builder.add_area_light(
+        &light_triangle_1,
+        Default::default(),
+        scene::InstanceTransform {
+            translation: glam::vec3(3.6, 5.2, 1.1),
+            ..Default::default()
+        },
+        &illuminant_a,
+        false,
+    );
+    builder.add_area_light(
+        &light_triangle_2,
+        Default::default(),
+        scene::InstanceTransform {
+            translation: glam::vec3(3.6, 5.2, 1.1),
+            ..Default::default()
+        },
+        &illuminant_a,
+        false,
     );
 
     let ground = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, 100.0);
     builder.add_shape(
         &ground,
-        material::Material::ground(glam::Vec3::ONE),
+        material::Material::ground(&spectrum::Spectrum::Default),
         Default::default(),
     );
 
-    // builder.add_uniform_infinite_light([0.5, 0.5, 0.5]);
-    // let env_image =
-    //     image::RgbImage::load_exr("hdris/HdrOutdoorSnowMountainsEveningClear001_HDR_4K.exr")?;
-    // let env_image = image::RgbImage::load_exr("hdris/qwantani_night_puresky_4k.exr")?;
-    let env_image = image::RgbImage::load_exr("hdris/kloppenheim_07_puresky_4k.exr")?;
-    builder.add_image_infinite_light(&env_image, 0.0);
+    let wall = geometry::Plane::new(glam::vec3(0.0, 0.0, 4.0), glam::Vec3::NEG_Z, 100.0);
+    builder.add_shape(&wall, Default::default(), Default::default());
+
+    let separator = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::X, 100.0);
+    builder.add_shape(&separator, Default::default(), Default::default());
 
     let scene = builder.build();
 
+    let light_sampler = light_sampler::LightSampler::<
+        light_sampler::MixtureLightSelector<
+            20,
+            light_sampler::UniformLightSelector,
+            light_sampler::PowerLightSelector,
+        >,
+    >::new(&scene, light_sampler::MisCompensation::Disabled);
     let light_sampler_compensated = light_sampler::LightSampler::<
         light_sampler::MixtureLightSelector<
             20,
@@ -127,6 +292,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         >,
     >::new(&scene, light_sampler::MisCompensation::Enabled);
 
+    let simple_path_tracing_integrator =
+        integrator::SimplePathTracingIntegrator::new(&light_sampler);
     let path_tracing_integrator =
         integrator::PathTracingIntegrator::new(&light_sampler_compensated);
 
@@ -135,11 +302,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &path_tracing_integrator,
             &mut camera,
             &scene,
-            64,
-            "PT_MIS_sRGB.exr",
+            16,
+            "SPECTRAL_MIS_TEST_16.exr",
             &color::SRGB,
         )?;
-        camera.film.save("PT_MIS_DCI_P3.exr", &color::DCI_P3)?;
+        integrator::render(
+            &simple_path_tracing_integrator,
+            &mut camera,
+            &scene,
+            16,
+            "SPECTRAL_MIS_TEST_SIMPLE_16.exr",
+            &color::SRGB,
+        )?;
+        integrator::render(
+            &path_tracing_integrator,
+            &mut camera,
+            &scene,
+            64,
+            "SPECTRAL_MIS_TEST_64.exr",
+            &color::SRGB,
+        )?;
+        integrator::render(
+            &simple_path_tracing_integrator,
+            &mut camera,
+            &scene,
+            64,
+            "SPECTRAL_MIS_TEST_SIMPLE_64.exr",
+            &color::SRGB,
+        )?;
     }
 
     Ok(())
