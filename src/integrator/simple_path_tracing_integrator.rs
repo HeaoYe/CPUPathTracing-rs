@@ -1,9 +1,11 @@
 use super::Integrator;
 use crate::{
     camera::{CameraModel, PixelSample},
+    color::ColorSpace,
     geometry::{Frame, Ray},
     light_sampler::{LightSampler, LightSelector, MisCompensation},
     scene::{HitInfo, Scene},
+    spectrum::{SpectrumSample, WavelengthSample},
     util::Rng,
 };
 
@@ -21,25 +23,28 @@ impl<'a, L> SimplePathTracingIntegrator<'a, L> {
 }
 
 impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
-    fn integrate(
+    fn integrate<'a>(
         &self,
         x: usize,
         y: usize,
         sample_index: usize,
         camera: &CameraModel,
         scene: &Scene,
-    ) -> Option<PixelSample<'_>> {
+        _target_color_space: &'a ColorSpace,
+    ) -> Option<PixelSample<'a>> {
         let mut rng = Rng::new(0, ((x + 1) * (y + 1) * sample_index) as u64);
 
+        let mut wavelength = WavelengthSample::uniform(rng.uniform());
         let mut ray = camera.generate_ray(
             glam::IVec2::new(x as i32, y as i32),
             glam::Vec2::new(rng.uniform(), rng.uniform()),
         );
-        let mut beta = glam::Vec3::ONE;
-        let mut radiance = glam::Vec3::ZERO;
+        let mut beta = SpectrumSample::ONE;
+        let mut radiance = SpectrumSample::ZERO;
         let q = 0.9;
         let mut last_is_delta = true;
         let mut last_surface_point = ray.origin;
+        let mut terminate_secondary = false;
 
         loop {
             let Some(HitInfo {
@@ -49,7 +54,7 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
             }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
             else {
                 if last_is_delta {
-                    radiance += beta * scene.infinite_radiance(ray.direction);
+                    radiance += beta * scene.infinite_radiance(ray.direction, &wavelength);
                 }
                 break;
             };
@@ -60,6 +65,7 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
                         last_surface_point,
                         intersection.hit_point,
                         intersection.normal,
+                        &wavelength,
                     );
             }
             last_surface_point = intersection.hit_point;
@@ -80,9 +86,9 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
 
             last_is_delta = material.bsdf.is_delta_distribution();
             if !last_is_delta
-                && let Some(light_sample) = self
-                    .light_sampler
-                    .sample_light(intersection.hit_point, &mut rng)
+                && let Some(light_sample) =
+                    self.light_sampler
+                        .sample_light(intersection.hit_point, &mut rng, &wavelength)
             {
                 let shadow_ray = Ray::new(
                     intersection.hit_point,
@@ -96,19 +102,26 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
                             intersection.hit_point,
                             light_direction_local,
                             view_direction,
+                            &wavelength,
                         ) * light_direction_local.y.abs()
                             * light_sample.radiance
                             / light_sample.pdf;
                 }
             }
 
-            let Some(scattering_sample) =
-                material
-                    .bsdf
-                    .sample(intersection.hit_point, view_direction, &mut rng)
-            else {
+            let Some(scattering_sample) = material.bsdf.sample(
+                intersection.hit_point,
+                view_direction,
+                &mut rng,
+                &wavelength,
+            ) else {
                 break;
             };
+
+            if !terminate_secondary && scattering_sample.dispersive_refraction {
+                terminate_secondary = true;
+            }
+
             beta *= scattering_sample.bsdf * scattering_sample.light_direction.y.abs()
                 / scattering_sample.pdf;
 
@@ -116,6 +129,10 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
             ray.direction = frame.world_from_local(scattering_sample.light_direction);
         }
 
-        Some(PixelSample::Radiance(radiance))
+        if terminate_secondary {
+            wavelength.terminate_secondary();
+        }
+
+        Some(PixelSample::Radiance(radiance, wavelength))
     }
 }

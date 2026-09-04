@@ -1,4 +1,4 @@
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct EncodedRgb {
     data: glam::Vec3,
 }

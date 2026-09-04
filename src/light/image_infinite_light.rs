@@ -1,5 +1,10 @@
 use super::LightSample;
-use crate::{image::RgbImage, light_sampler::MisCompensation, sample::AliasTable};
+use crate::{
+    image::RgbImage,
+    light_sampler::MisCompensation,
+    sample::AliasTable,
+    spectrum::{SpectrumSample, WavelengthSample},
+};
 
 pub struct ImageInfiniteLight<'a> {
     image: &'a RgbImage<'a>,
@@ -100,10 +105,11 @@ impl<'a> ImageInfiniteLight<'a> {
             Some(LightSample {
                 light_point: surface_point + 2.0 * scene_radius * light_direction,
                 light_direction,
-                radiance: self
-                    .image
-                    .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-                    .as_vec3(),
+                // radiance: self
+                //     .image
+                //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+                //     .as_vec3(),
+                radiance: SpectrumSample::ZERO, // INCOMPLETED
                 pdf: sample.pmf * self.image.width() as f32 * self.image.height() as f32
                     / (2.0
                         * std::f32::consts::PI
@@ -115,14 +121,19 @@ impl<'a> ImageInfiniteLight<'a> {
         }
     }
 
-    pub(crate) fn radiance(&self, light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn radiance(
+        &self,
+        light_direction: glam::Vec3,
+        _wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         if light_direction.y.abs() >= 1.0 {
-            glam::Vec3::ZERO
+            SpectrumSample::ZERO
         } else {
-            let image_point = self.image_point_from_direction(light_direction);
-            self.image
-                .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-                .as_vec3()
+            let _image_point = self.image_point_from_direction(light_direction);
+            // self.image
+            //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+            //     .as_vec3()
+            SpectrumSample::ZERO // INCOMPLETED
         }
     }
 

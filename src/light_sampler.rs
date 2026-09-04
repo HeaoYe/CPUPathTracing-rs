@@ -11,6 +11,7 @@ pub use uniform_light_selector::UniformLightSelector;
 use crate::{
     light::{Light, LightSample},
     scene::{LightId, Scene},
+    spectrum::WavelengthSample,
     util::Rng,
 };
 
@@ -43,7 +44,12 @@ impl<'a, L: LightSelector> LightSampler<'a, L> {
 }
 
 impl<L: LightSelector> LightSampler<'_, L> {
-    pub fn sample_light(&self, surface_point: glam::Vec3, rng: &mut Rng) -> Option<LightSample> {
+    pub fn sample_light(
+        &self,
+        surface_point: glam::Vec3,
+        rng: &mut Rng,
+        wavelength: &WavelengthSample,
+    ) -> Option<LightSample> {
         let light_selection = self.light_selector.sample_light_source(rng)?;
         let light = &self.scene.get_light(light_selection.id)?;
         let mut sample = match light {
@@ -58,12 +64,14 @@ impl<L: LightSelector> LightSampler<'_, L> {
                     &shape_instance.world_from_object(),
                     &shape_instance.object_from_world(),
                     rng,
+                    wavelength,
                 )
             }
             Light::Infinite(light) => light.sample(
                 surface_point,
                 self.scene.radius(),
                 rng,
+                wavelength,
                 self.mis_compensation,
             ),
         }?;

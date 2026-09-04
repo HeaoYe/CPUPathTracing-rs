@@ -1,8 +1,10 @@
 use super::Chromaticity;
-use crate::spectrum::{Spectrum, X_CMF, Y_CMF, Z_CMF};
+use crate::spectrum::{
+    Spectrum, SpectrumSample, WAVELENGTH_SAMPLE_COUNT, WavelengthSample, X_CMF, Y_CMF, Z_CMF,
+};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Xyz {
     data: glam::Vec3,
 }
@@ -43,6 +45,31 @@ impl Xyz {
         result
     }
 
+    pub fn from_spectrum_sample(
+        spectrum_sample: SpectrumSample,
+        wavelength: &WavelengthSample,
+    ) -> Self {
+        let mut xyz = glam::Vec3::ZERO;
+
+        for i in 0..WAVELENGTH_SAMPLE_COUNT {
+            let pdf = wavelength.pdf(i);
+            if pdf == 0.0 {
+                continue;
+            }
+
+            let value = spectrum_sample[i] / pdf;
+            let lambda = wavelength.lambda(i);
+
+            xyz.x += value * X_CMF.eval(lambda);
+            xyz.y += value * Y_CMF.eval(lambda);
+            xyz.z += value * Z_CMF.eval(lambda);
+        }
+
+        xyz /= WAVELENGTH_SAMPLE_COUNT as f32;
+
+        Self::from_vec3(xyz)
+    }
+
     pub fn x(&self) -> f32 {
         self.data.x
     }
@@ -61,6 +88,10 @@ impl Xyz {
 
     pub fn as_dvec3(&self) -> glam::DVec3 {
         self.data.as_dvec3()
+    }
+
+    pub fn is_nan(&self) -> bool {
+        self.data.is_nan()
     }
 }
 

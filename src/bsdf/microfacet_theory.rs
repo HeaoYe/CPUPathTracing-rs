@@ -1,5 +1,6 @@
 use crate::{geometry::Frame, sample::uniform, util::Rng};
 
+#[derive(Clone, Copy)]
 pub(super) struct MicrofacetTheory {
     alpha_x: f32,
     alpha_z: f32,

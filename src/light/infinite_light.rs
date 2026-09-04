@@ -1,8 +1,11 @@
 use super::{ImageInfiniteLight, LightSample, UniformInfiniteLight};
-use crate::light_sampler::MisCompensation;
+use crate::{
+    light_sampler::MisCompensation,
+    spectrum::{SpectrumSample, WavelengthSample},
+};
 
 pub enum InfiniteLight<'a> {
-    Uniform(UniformInfiniteLight),
+    Uniform(UniformInfiniteLight<'a>),
     Image(Box<ImageInfiniteLight<'a>>),
 }
 
@@ -26,20 +29,29 @@ impl<'a> InfiniteLight<'a> {
         surface_point: glam::Vec3,
         scene_radius: f32,
         rng: &mut crate::util::Rng,
+        wavelength: &WavelengthSample,
         mis_compensation: MisCompensation,
     ) -> Option<LightSample> {
         match self {
-            Self::Uniform(light) => {
-                light.sample(surface_point, scene_radius, rng, mis_compensation)
-            }
+            Self::Uniform(light) => light.sample(
+                surface_point,
+                scene_radius,
+                rng,
+                wavelength,
+                mis_compensation,
+            ),
             Self::Image(light) => light.sample(surface_point, scene_radius, rng, mis_compensation),
         }
     }
 
-    pub(crate) fn radiance(&self, light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn radiance(
+        &self,
+        light_direction: glam::Vec3,
+        wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         match self {
-            Self::Uniform(light) => light.radiance(),
-            Self::Image(light) => light.radiance(light_direction),
+            Self::Uniform(light) => light.radiance(wavelength),
+            Self::Image(light) => light.radiance(light_direction, wavelength),
         }
     }
 

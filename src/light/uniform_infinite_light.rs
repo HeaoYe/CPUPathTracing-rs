@@ -1,12 +1,16 @@
 use super::LightSample;
-use crate::{light_sampler::MisCompensation, sample::uniform};
+use crate::{
+    light_sampler::MisCompensation,
+    sample::uniform,
+    spectrum::{Spectrum, SpectrumSample, WavelengthSample},
+};
 
-pub struct UniformInfiniteLight {
-    radiance: glam::Vec3,
+pub struct UniformInfiniteLight<'a> {
+    radiance: &'a Spectrum<'a>,
 }
 
-impl UniformInfiniteLight {
-    pub(crate) fn new(radiance: glam::Vec3) -> Self {
+impl<'a> UniformInfiniteLight<'a> {
+    pub(crate) fn new(radiance: &'a Spectrum<'a>) -> Self {
         Self { radiance }
     }
 
@@ -15,7 +19,7 @@ impl UniformInfiniteLight {
             * std::f32::consts::PI
             * scene_radius
             * scene_radius
-            * self.radiance.max_element()
+            * self.radiance.max()
     }
 
     pub(crate) fn skip_mis_compensation(&self) -> bool {
@@ -27,6 +31,7 @@ impl UniformInfiniteLight {
         surface_point: glam::Vec3,
         scene_radius: f32,
         rng: &mut crate::util::Rng,
+        wavelength: &WavelengthSample,
         mis_compensation: MisCompensation,
     ) -> Option<LightSample> {
         match mis_compensation {
@@ -35,7 +40,7 @@ impl UniformInfiniteLight {
                 Some(LightSample {
                     light_point: surface_point + 2.0 * scene_radius * light_direction,
                     light_direction,
-                    radiance: self.radiance,
+                    radiance: self.radiance.sample(wavelength),
                     pdf: 0.25 * std::f32::consts::FRAC_1_PI,
                 })
             }
@@ -43,8 +48,8 @@ impl UniformInfiniteLight {
         }
     }
 
-    pub(crate) fn radiance(&self) -> glam::Vec3 {
-        self.radiance
+    pub(crate) fn radiance(&self, wavelength: &WavelengthSample) -> SpectrumSample {
+        self.radiance.sample(wavelength)
     }
 
     pub(crate) fn pdf(&self, mis_compensation: MisCompensation) -> f32 {

@@ -2,19 +2,20 @@ use super::LightSample;
 use crate::{
     geometry::{Sampleable, SurfaceSample},
     scene::ShapeInstanceId,
+    spectrum::{Spectrum, SpectrumSample, WavelengthSample},
     util::Rng,
 };
 
-pub struct AreaLight {
+pub struct AreaLight<'a> {
     pub(crate) shape_instance_id: ShapeInstanceId,
-    radiance: glam::Vec3,
+    radiance: &'a Spectrum<'a>,
     double_side: bool,
 }
 
-impl AreaLight {
+impl<'a> AreaLight<'a> {
     pub(crate) fn new(
         shape_instance_id: ShapeInstanceId,
-        radiance: glam::Vec3,
+        radiance: &'a Spectrum<'a>,
         double_side: bool,
     ) -> Self {
         Self {
@@ -28,7 +29,7 @@ impl AreaLight {
         (if self.double_side { 2.0 } else { 1.0 })
             * std::f32::consts::PI
             * shape.area()
-            * self.radiance.max_element()
+            * self.radiance.max()
     }
 
     pub(crate) fn sample(
@@ -38,6 +39,7 @@ impl AreaLight {
         world_from_object: &glam::Affine3A,
         object_from_world: &glam::Affine3A,
         rng: &mut Rng,
+        wavelength: &WavelengthSample,
     ) -> Option<LightSample> {
         let SurfaceSample {
             position,
@@ -60,7 +62,7 @@ impl AreaLight {
         Some(LightSample {
             light_point,
             light_direction,
-            radiance: self.radiance,
+            radiance: self.radiance.sample(wavelength),
             pdf: pdf / det_j,
         })
     }
@@ -70,15 +72,16 @@ impl AreaLight {
         surface_point: glam::Vec3,
         light_point: glam::Vec3,
         normal: glam::Vec3,
-    ) -> glam::Vec3 {
+        wavelength: &WavelengthSample,
+    ) -> SpectrumSample {
         let cos_theta_l = normal.dot(surface_point - light_point);
         if cos_theta_l == 0.0 {
-            return glam::Vec3::ZERO;
+            return SpectrumSample::ZERO;
         }
         if !self.double_side && cos_theta_l < 0.0 {
-            return glam::Vec3::ZERO;
+            return SpectrumSample::ZERO;
         }
-        self.radiance
+        self.radiance.sample(wavelength)
     }
 
     pub(crate) fn pdf(

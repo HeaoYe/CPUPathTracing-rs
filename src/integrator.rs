@@ -19,14 +19,15 @@ use crate::{
 };
 
 pub trait Integrator {
-    fn integrate(
+    fn integrate<'a>(
         &self,
         x: usize,
         y: usize,
         sample_index: usize,
         camera: &CameraModel,
         scene: &Scene,
-    ) -> Option<PixelSample<'_>>;
+        target_color_space: &'a ColorSpace,
+    ) -> Option<PixelSample<'a>>;
 }
 
 pub fn render<T>(
@@ -58,8 +59,14 @@ where
             film.as_slice_mut(),
             |x, y, pixel| {
                 for i in 1..=batch_spp {
-                    if let Some(sample) = integrator.integrate(x, y, current_spp + i, model, scene)
-                    {
+                    if let Some(sample) = integrator.integrate(
+                        x,
+                        y,
+                        current_spp + i,
+                        model,
+                        scene,
+                        target_color_space,
+                    ) {
                         pixel.add_sample(sample);
                     }
                 }

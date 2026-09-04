@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**23 / 25 — 光谱渲染（上）色彩科学**
+当前进度：**24-1 / 25 — Lecture24-1 光谱渲染（中）基础框架**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -35,7 +35,7 @@
 - [x] [Lecture21](../../tree/Lecture21) 环境光照
 - [x] [Lecture22](../../tree/Lecture22) 代码勘误和一些改进
 - [x] [Lecture23](../../tree/Lecture23) 光谱渲染（上）色彩科学
-- [ ] Lecture24-1 光谱渲染（中）基础框架
+- [x] [Lecture24-1](../../tree/Lecture24) 光谱渲染（中）基础框架
 - [ ] Lecture24-2 光谱渲染（中）Spectral MIS
 - [ ] Lecture25 光谱渲染（下）RGB 转光谱
 
@@ -46,10 +46,11 @@ git clone https://github.com/HeaoYe/CPUPathTracing-rs.git
 ```
 
 ### 下载资源文件
-- 新建models文件夹
+- 新建models、hdris、spectrums文件夹
 - 下载[资源文件](https://github.com/HeaoYe/CPUPathTracing/releases)
 - 将.obj模型文件放入models文件夹
 - 将.exr贴图文件放入hdris文件夹
+- 将.csv光谱文件放入spectrums文件夹
 - 文件夹结构预览
 ```txt
  CPUPathTracing-rs
@@ -62,6 +63,11 @@ git clone https://github.com/HeaoYe/CPUPathTracing-rs.git
  │   ├── dragon_87k.obj
  │   ├── dragon_871k.obj
  │   └── simple_dragon.obj
+ ├── spectrums
+ │   ├── Johnson-copper.csv
+ │   ├── Metameric_A_reflectance.csv
+ │   ├── Metameric_B_reflectance.csv
+ │   └── Zelmon-glass.csv
  ├── .vscode/
  ├── src/
  ├── .gitignore
