@@ -2,7 +2,7 @@ use crate::{THREAD_POOL, image::RgbImage, util::Rgb};
 
 #[derive(Default, Clone)]
 pub struct Pixel {
-    color_sum: glam::Vec3,
+    color_sum: glam::DVec3,
     sample_count: usize,
 }
 
@@ -18,9 +18,9 @@ impl Pixel {
                 if radiance.is_nan() {
                     return;
                 }
-                self.color_sum += radiance
+                self.color_sum += radiance.as_dvec3()
             }
-            PixelSample::Rgb(rgb) => self.color_sum += glam::Vec3::from(rgb),
+            PixelSample::Rgb(rgb) => self.color_sum += glam::Vec3::from(rgb).as_dvec3(),
         }
         self.sample_count += 1;
     }
@@ -29,7 +29,7 @@ impl Pixel {
         if self.sample_count == 0 {
             glam::Vec3::ZERO
         } else {
-            self.color_sum / self.sample_count as f32
+            (self.color_sum / self.sample_count as f64).as_vec3()
         }
     }
 }
