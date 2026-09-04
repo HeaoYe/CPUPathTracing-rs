@@ -6,7 +6,7 @@ mod linear_rgb;
 mod xyz;
 
 pub use chromaticity::Chromaticity;
-pub use color_lut::test_optimize;
+pub use color_lut::{ColorLut, LUT_SRGB};
 pub use color_space::{ColorSpace, DCI_P3, SRGB};
 pub use encoded_rgb::{EncodedRgb, TransferFunction};
 pub use linear_rgb::LinearRgb;

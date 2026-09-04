@@ -1,5 +1,6 @@
 use crate::spectrum::{LAMBDA_MAX, LAMBDA_MIN};
 
+#[derive(Clone, Copy, Default)]
 pub struct SigmoidPolynomialSpectrum {
     c0: f32,
     c1: f32,

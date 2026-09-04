@@ -1,7 +1,10 @@
 use crate::{
-    color::{ColorSpace, LinearRgb, SRGB, Xyz},
+    THREAD_POOL,
+    color::{ColorSpace, EncodedRgb, LinearRgb, SRGB, Xyz},
     spectrum::{CIE_STD_ILLUMNT_D65, LAMBDA_MAX, LAMBDA_MIN, Spectrum, X_CMF, Y_CMF, Z_CMF},
+    util::{Progress, profile},
 };
+use std::sync::LazyLock;
 
 fn sigmoid_and_derivate(x: f64) -> (f64, f64) {
     let a = 1.0 + x * x;
@@ -56,6 +59,7 @@ impl<'a> OptimizeContext<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct OptimizeOptions {
     init_mu: f64,
     max_mu: f64,
@@ -209,28 +213,261 @@ fn optimize(
     current
 }
 
-pub fn test_optimize() {
-    let context = OptimizeContext::new(&SRGB, &CIE_STD_ILLUMNT_D65);
+const LUT_RESOLUTION: usize = 64;
+const LUT_MAGIC: u32 = 0x87d4_b1a6;
 
-    let rgb_target = LinearRgb::new(0.2, 0.6, 0.3);
+type LutCell = [glam::Vec3; LUT_RESOLUTION];
 
-    let initial = Evaluation::eval(&context, glam::DVec3::ZERO);
-    let result = optimize(&context, rgb_target, initial, Default::default());
-    let r = Spectrum::sigmoid(
-        result.theta.x as f32,
-        result.theta.y as f32,
-        result.theta.z as f32,
-    );
-    let s = Spectrum::analytic(
-        move |lambda: f32| {
-            context.k as f32 * context.illuminant_white.eval(lambda) * r.eval(lambda)
-        },
-        LAMBDA_MIN as f32,
-        LAMBDA_MAX as f32,
-    );
-    let xyz_pred = Xyz::from_spectrum(&s);
-    let rgb_pred = SRGB.rgb_from_xyz(xyz_pred);
+pub struct ColorLut<'a> {
+    color_space: &'a ColorSpace,
+    illuminant: &'a Spectrum<'a>,
 
-    println!("Target: {:?}", rgb_target);
-    println!(" Pred : {:?}", rgb_pred);
+    alpha_nodes: [f64; LUT_RESOLUTION],
+
+    // data [i][y][x] [alpha] -> Vec3(theta0, theta1, theta2)
+    data: Vec<LutCell>,
 }
+
+impl<'a> ColorLut<'a> {
+    pub fn new(
+        filename: impl AsRef<std::path::Path>,
+        color_space: &'a ColorSpace,
+        illuminant: &'a Spectrum<'a>,
+    ) -> Self {
+        let smooth = |t: f64| t * t * (3.0 - 2.0 * t);
+        let alpha_nodes = std::array::from_fn(|i| {
+            let t = i as f64 / (LUT_RESOLUTION - 1) as f64;
+            smooth(smooth(t))
+        });
+
+        let mut lut = Self {
+            color_space,
+            illuminant,
+            alpha_nodes,
+            data: vec![[glam::Vec3::ZERO; LUT_RESOLUTION]; 3 * LUT_RESOLUTION * LUT_RESOLUTION],
+        };
+
+        let loaded = lut.load(filename.as_ref()).unwrap_or_else(|err| {
+            eprintln!("Failed to load color LUT: {}", err);
+            false
+        });
+
+        if !loaded {
+            lut.generate();
+            if let Err(err) = lut.save(filename.as_ref()) {
+                println!("Failed to save color LUT: {}", err)
+            }
+        }
+
+        lut
+    }
+
+    pub fn color_space(&self) -> &ColorSpace {
+        self.color_space
+    }
+
+    pub fn illuminant(&self) -> &Spectrum<'a> {
+        self.illuminant
+    }
+
+    pub fn lookup_rgb8(&self, r: u8, g: u8, b: u8) -> Spectrum<'_> {
+        self.lookup_encoded(EncodedRgb::from_quantized(r as u32, g as u32, b as u32, 8))
+    }
+
+    pub fn lookup_encoded(&self, encoded_rgb: EncodedRgb) -> Spectrum<'_> {
+        self.lookup_linear(self.color_space.decode(encoded_rgb))
+    }
+
+    pub fn lookup_linear(&self, linear_rgb: LinearRgb) -> Spectrum<'_> {
+        let color = glam::vec3(linear_rgb.r(), linear_rgb.g(), linear_rgb.b())
+            .clamp(glam::Vec3::ZERO, glam::Vec3::ONE);
+
+        let i = color.max_position();
+        let alpha = color[i];
+        if alpha == 0.0 {
+            return Spectrum::sigmoid(f32::NEG_INFINITY, 0.0, 0.0);
+        }
+
+        let x = color[(i + 1) % 3] / alpha;
+        let y = color[(i + 2) % 3] / alpha;
+
+        let alpha_i = self.find_alpha_node_index(alpha);
+        let x_pos = x * (LUT_RESOLUTION - 1) as f32;
+        let y_pos = y * (LUT_RESOLUTION - 1) as f32;
+        let xi = (x_pos.floor() as usize).min(LUT_RESOLUTION - 2);
+        let yi = (y_pos.floor() as usize).min(LUT_RESOLUTION - 2);
+
+        let x_t = x_pos - xi as f32;
+        let y_t = y_pos - yi as f32;
+
+        let alpha0 = self.alpha_nodes[alpha_i] as f32;
+        let alpha1 = self.alpha_nodes[alpha_i + 1] as f32;
+        let alpha_t = (alpha - alpha0) / (alpha1 - alpha0);
+
+        let lower = self
+            .at(i, xi, yi, alpha_i)
+            .lerp(self.at(i, xi + 1, yi, alpha_i), x_t)
+            .lerp(
+                self.at(i, xi, yi + 1, alpha_i)
+                    .lerp(self.at(i, xi + 1, yi + 1, alpha_i), x_t),
+                y_t,
+            );
+        let upper = self
+            .at(i, xi, yi, alpha_i + 1)
+            .lerp(self.at(i, xi + 1, yi, alpha_i + 1), x_t)
+            .lerp(
+                self.at(i, xi, yi + 1, alpha_i + 1)
+                    .lerp(self.at(i, xi + 1, yi + 1, alpha_i + 1), x_t),
+                y_t,
+            );
+        let theta = lower.lerp(upper, alpha_t);
+
+        Spectrum::sigmoid(theta.x, theta.y, theta.z)
+    }
+
+    fn find_alpha_node_index(&self, alpha: f32) -> usize {
+        let alpha = alpha as f64;
+        if alpha <= self.alpha_nodes[0] {
+            return 0;
+        }
+        if alpha >= self.alpha_nodes[LUT_RESOLUTION - 1] {
+            return LUT_RESOLUTION - 2;
+        }
+        self.alpha_nodes.partition_point(|&node| node <= alpha) - 1
+    }
+
+    fn cell_index(i: usize, x: usize, y: usize) -> usize {
+        (i * LUT_RESOLUTION + y) * LUT_RESOLUTION + x
+    }
+
+    fn at(&self, i: usize, x: usize, y: usize, alpha: usize) -> glam::Vec3 {
+        self.data[Self::cell_index(i, x, y)][alpha]
+    }
+
+    fn load(&mut self, filename: &std::path::Path) -> std::io::Result<bool> {
+        use bytemuck::cast_slice_mut;
+        use std::{
+            fs::File,
+            io::{BufReader, Read},
+        };
+
+        let file = match File::open(filename) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(false);
+            }
+            Err(error) => return Err(error),
+        };
+
+        let mut file = BufReader::new(file);
+
+        let mut header = [0u8; 8];
+        if file.read_exact(&mut header).is_err() {
+            return Ok(false);
+        }
+
+        let magic = u32::from_le_bytes(header[0..4].try_into().unwrap());
+        let resolution = u32::from_le_bytes(header[4..8].try_into().unwrap());
+        if magic != LUT_MAGIC || resolution != LUT_RESOLUTION as u32 {
+            return Ok(false);
+        }
+
+        if file.read_exact(cast_slice_mut(&mut self.data)).is_err() {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+
+    fn save(&self, filename: &std::path::Path) -> std::io::Result<()> {
+        use bytemuck::cast_slice;
+        use std::{
+            fs::File,
+            io::{BufWriter, Write},
+        };
+
+        let mut file = BufWriter::new(File::create(filename)?);
+
+        file.write_all(&LUT_MAGIC.to_le_bytes())?;
+        file.write_all(&(LUT_RESOLUTION as u32).to_le_bytes())?;
+        file.write_all(cast_slice(&self.data))?;
+
+        Ok(())
+    }
+
+    fn make_rgb_target(
+        alpha_nodes: &[f64; LUT_RESOLUTION],
+        i: usize,
+        x: f32,
+        y: f32,
+        alpha_i: usize,
+    ) -> LinearRgb {
+        let alpha = alpha_nodes[alpha_i] as f32;
+
+        let mut rgb = [0.0; 3];
+
+        rgb[i] = alpha;
+        rgb[(i + 1) % 3] = alpha * x;
+        rgb[(i + 2) % 3] = alpha * y;
+
+        LinearRgb::new(rgb[0], rgb[1], rgb[2])
+    }
+
+    fn generate(&mut self) {
+        profile!("Generate Color LUT, resolution = {}", LUT_RESOLUTION);
+
+        const K_START: usize = LUT_RESOLUTION / 5;
+
+        let context = OptimizeContext::new(self.color_space, self.illuminant);
+        let options = OptimizeOptions::default();
+
+        let progress = Progress::new(3 * LUT_RESOLUTION * LUT_RESOLUTION * LUT_RESOLUTION, 5);
+        for i in 0..3 {
+            let begin = i * LUT_RESOLUTION * LUT_RESOLUTION;
+            let end = begin + LUT_RESOLUTION * LUT_RESOLUTION;
+            let data = &mut self.data[begin..end];
+
+            THREAD_POOL.parallel_for_2d(LUT_RESOLUTION, LUT_RESOLUTION, data, |xi, yi, cell| {
+                let x = xi as f32 / (LUT_RESOLUTION - 1) as f32;
+                let y = yi as f32 / (LUT_RESOLUTION - 1) as f32;
+
+                let mut initial = Evaluation::eval(&context, glam::DVec3::ZERO);
+
+                initial = optimize(
+                    &context,
+                    Self::make_rgb_target(&self.alpha_nodes, i, x, y, K_START),
+                    initial,
+                    options,
+                );
+                cell[K_START] = initial.theta.as_vec3();
+
+                let mut up = initial;
+                for k in K_START + 1..LUT_RESOLUTION {
+                    up = optimize(
+                        &context,
+                        Self::make_rgb_target(&self.alpha_nodes, i, x, y, k),
+                        up,
+                        options,
+                    );
+                    cell[k] = up.theta.as_vec3();
+                }
+
+                let mut down = initial;
+                for k in (0..K_START).rev() {
+                    down = optimize(
+                        &context,
+                        Self::make_rgb_target(&self.alpha_nodes, i, x, y, k),
+                        down,
+                        options,
+                    );
+                    cell[k] = down.theta.as_vec3();
+                }
+
+                progress.update(LUT_RESOLUTION);
+            });
+        }
+    }
+}
+
+pub static LUT_SRGB: LazyLock<ColorLut> =
+    LazyLock::new(|| ColorLut::new("spectrums/ColorLUT_sRGB.lut", &SRGB, &CIE_STD_ILLUMNT_D65));

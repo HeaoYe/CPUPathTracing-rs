@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-glam = "0.33"
+glam = { version = "0.33", features = ["bytemuck"] }
 rand = "0.10"
 rand_pcg = "0.10"
 winit = "0.30"
 softbuffer = "0.4"
 exr = "1.74"
 csv = "1.4"
+bytemuck = "1.25"
 
 [profile.dev]
 opt-level = 1

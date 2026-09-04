@@ -1,44 +1,15 @@
 use cpu_path_tracing::{
-    camera, color, geometry, integrator, light_sampler, material, scene, spectrum,
+    camera,
+    color::{self, LinearRgb},
+    geometry, image, integrator, light_sampler, material, sample, scene, spectrum, util,
 };
 
-fn rgb_spectrum<'a>(r: u8, g: u8, b: u8) -> spectrum::Spectrum<'a> {
-    let data = color::SRGB.decode(color::EncodedRgb::from_quantized(
-        r as u32, g as u32, b as u32, 8,
-    ));
-    spectrum::Spectrum::piecewise_linear_from_samples([
-        spectrum::SamplePoint {
-            lambda: 360.0,
-            value: data.b() / 3.0,
-        },
-        spectrum::SamplePoint {
-            lambda: 400.0,
-            value: data.b(),
-        },
-        spectrum::SamplePoint {
-            lambda: 525.0,
-            value: data.g(),
-        },
-        spectrum::SamplePoint {
-            lambda: 650.0,
-            value: data.r(),
-        },
-        spectrum::SamplePoint {
-            lambda: 830.0,
-            value: data.r() / 3.0,
-        },
-    ])
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    color::test_optimize();
-    return Ok(());
-
     let film = camera::Film::new(192 * 10, 108 * 10);
     let mut camera = camera::Camera::new(
         film,
-        glam::vec3(0.0, 4.0, -8.0),
-        glam::vec3(0.0, 2.1, 0.2),
+        glam::vec3(0.0, 1.25, -10.0),
+        glam::vec3(0.0, 3.95, 2.0),
         48.0,
     );
 
@@ -66,14 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         1e3,
         "n",
     )?;
-    let glass_albedo = rgb_spectrum(210, 210, 184);
-    let glass = material::Material::dielectric_with_alpha(
-        &glass_eta,
-        &glass_albedo,
-        &glass_albedo,
-        0.21,
-        0.08,
-    );
+    let glass_tint = color::LUT_SRGB.lookup_rgb8(210, 210, 184);
+    let glass = material::Material::dielectric_with_alpha_tint(&glass_eta, &glass_tint, 0.21, 0.08);
 
     builder.add_shape(
         &buddha,
@@ -212,58 +177,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    let vertices = [
-        glam::vec3(-2.4, 0.0, -1.3),
-        glam::vec3(-2.4, 0.0, 1.3),
-        glam::vec3(2.4, 0.0, -1.3),
-        glam::vec3(2.4, 0.0, 1.3),
-    ];
-    let light_triangle_1 = geometry::Triangle::from_points(vertices[0], vertices[2], vertices[1]);
-    let light_triangle_2 = geometry::Triangle::from_points(vertices[1], vertices[2], vertices[3]);
+    const DRAGON_COUNT: usize = 1200;
+    let mut rng = util::Rng::new(DRAGON_COUNT as u64, 0);
+    let reflectance_spectral: Vec<_> = std::iter::repeat_with(|| {
+        color::LUT_SRGB.lookup_linear(LinearRgb::new(rng.uniform(), rng.uniform(), rng.uniform()))
+    })
+    .take(DRAGON_COUNT)
+    .collect();
 
-    let illuminant_d65 = spectrum::Spectrum::illuminant(&spectrum::CIE_STD_ILLUMNT_D65, 2400.0);
-    let illuminant_a = spectrum::Spectrum::illuminant(&spectrum::CIE_STD_ILLUMNT_A, 2400.0);
+    for spectral in &reflectance_spectral {
+        let disk = sample::uniform::disk(rng.uniform(), rng.uniform()) * 12.0;
 
-    builder.add_area_light(
-        &light_triangle_1,
-        Default::default(),
-        scene::InstanceTransform {
-            translation: glam::vec3(-3.6, 5.2, 1.1),
-            ..Default::default()
-        },
-        &illuminant_d65,
-        false,
-    );
-    builder.add_area_light(
-        &light_triangle_2,
-        Default::default(),
-        scene::InstanceTransform {
-            translation: glam::vec3(-3.6, 5.2, 1.1),
-            ..Default::default()
-        },
-        &illuminant_d65,
-        false,
-    );
-    builder.add_area_light(
-        &light_triangle_1,
-        Default::default(),
-        scene::InstanceTransform {
-            translation: glam::vec3(3.6, 5.2, 1.1),
-            ..Default::default()
-        },
-        &illuminant_a,
-        false,
-    );
-    builder.add_area_light(
-        &light_triangle_2,
-        Default::default(),
-        scene::InstanceTransform {
-            translation: glam::vec3(3.6, 5.2, 1.1),
-            ..Default::default()
-        },
-        &illuminant_a,
-        false,
-    );
+        builder.add_shape(
+            &dragon,
+            material::Material::diffuse(spectral),
+            scene::InstanceTransform {
+                translation: glam::vec3(disk.x, disk.y.abs(), 4.0),
+                rotation: glam::Quat::from_euler(
+                    glam::EulerRot::ZYX,
+                    (rng.uniform() * 360.0).to_radians(),
+                    (rng.uniform() * 360.0).to_radians(),
+                    (rng.uniform() * 360.0).to_radians(),
+                ),
+                ..Default::default()
+            },
+        );
+    }
 
     let ground = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::Y, 100.0);
     builder.add_shape(
@@ -272,11 +211,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     );
 
-    let wall = geometry::Plane::new(glam::vec3(0.0, 0.0, 4.0), glam::Vec3::NEG_Z, 100.0);
-    builder.add_shape(&wall, Default::default(), Default::default());
-
-    let separator = geometry::Plane::new(glam::Vec3::ZERO, glam::Vec3::X, 100.0);
-    builder.add_shape(&separator, Default::default(), Default::default());
+    let env_image = image::RgbImage::load_exr("hdris/kloppenheim_07_puresky_4k.exr")?;
+    builder.add_image_infinite_light(&env_image, 80.0);
+    // let uniform_light = spectrum::Spectrum::rgb_illuminant_linear_rgb(
+    //     &color::LUT_SRGB,
+    //     LinearRgb::new(1.0, 0.9, 0.8),
+    // );
+    // builder.add_uniform_infinite_light(&uniform_light);
 
     let scene = builder.build();
 
@@ -305,24 +246,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &path_tracing_integrator,
             &mut camera,
             &scene,
-            16,
-            "SPECTRAL_MIS_TEST_16.exr",
-            &color::SRGB,
-        )?;
-        integrator::render(
-            &simple_path_tracing_integrator,
-            &mut camera,
-            &scene,
-            16,
-            "SPECTRAL_MIS_TEST_SIMPLE_16.exr",
-            &color::SRGB,
-        )?;
-        integrator::render(
-            &path_tracing_integrator,
-            &mut camera,
-            &scene,
             64,
-            "SPECTRAL_MIS_TEST_64.exr",
+            "RGB2SPECTRAL_TEST_64.exr",
             &color::SRGB,
         )?;
         integrator::render(
@@ -330,7 +255,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             64,
-            "SPECTRAL_MIS_TEST_SIMPLE_64.exr",
+            "RGB2SPECTRAL_TEST_64_SIMPLE.exr",
             &color::SRGB,
         )?;
     }

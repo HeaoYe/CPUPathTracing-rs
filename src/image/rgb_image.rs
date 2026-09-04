@@ -146,6 +146,10 @@ impl<'a> RgbImage<'a> {
 
         exr_image.write().to_file(filename)
     }
+
+    pub fn color_space(&self) -> &ColorSpace {
+        self.color_space
+    }
 }
 
 impl Deref for RgbImage<'_> {

@@ -19,9 +19,7 @@ impl<'a> AnalyticSpectrum<'a> {
         let mut lambda = lambda_min + 0.1;
         while lambda < lambda_max {
             let value = expression(lambda);
-            if maximum < value {
-                maximum = value;
-            }
+            maximum = maximum.max(value);
             lambda += 0.1;
         }
 

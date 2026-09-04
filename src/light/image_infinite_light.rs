@@ -1,13 +1,14 @@
 use super::LightSample;
 use crate::{
-    image::RgbImage,
+    color::LUT_SRGB,
+    image::{RgbIlluminantImage, RgbImage},
     light_sampler::MisCompensation,
     sample::AliasTable,
     spectrum::{SpectrumSample, WavelengthSample},
 };
 
 pub struct ImageInfiniteLight<'a> {
-    image: &'a RgbImage<'a>,
+    image: RgbIlluminantImage<'a>,
     start_phi: f32,
     power: f32,
     gird_count: glam::USizeVec2,
@@ -22,7 +23,7 @@ impl<'a> ImageInfiniteLight<'a> {
     pub(crate) fn new(image: &'a RgbImage, start_phi: f32) -> Self {
         let gird_count = image.resolution() / GIRD_SIZE + 1;
         let mut light = Self {
-            image,
+            image: RgbIlluminantImage::new(&LUT_SRGB, image),
             start_phi,
             power: 0.0,
             gird_count,
@@ -84,6 +85,7 @@ impl<'a> ImageInfiniteLight<'a> {
         surface_point: glam::Vec3,
         scene_radius: f32,
         rng: &mut crate::util::Rng,
+        wavelength: &WavelengthSample,
         mis_compensation: MisCompensation,
     ) -> Option<LightSample> {
         let sample = self
@@ -105,11 +107,7 @@ impl<'a> ImageInfiniteLight<'a> {
             Some(LightSample {
                 light_point: surface_point + 2.0 * scene_radius * light_direction,
                 light_direction,
-                // radiance: self
-                //     .image
-                //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-                //     .as_vec3(),
-                radiance: SpectrumSample::ZERO, // INCOMPLETED
+                radiance: self.image.sample_image_point(image_point, wavelength),
                 pdf: SpectrumSample::splat(
                     sample.pmf * self.image.width() as f32 * self.image.height() as f32
                         / (2.0
@@ -126,16 +124,13 @@ impl<'a> ImageInfiniteLight<'a> {
     pub(crate) fn radiance(
         &self,
         light_direction: glam::Vec3,
-        _wavelength: &WavelengthSample,
+        wavelength: &WavelengthSample,
     ) -> SpectrumSample {
         if light_direction.y.abs() >= 1.0 {
             SpectrumSample::ZERO
         } else {
-            let _image_point = self.image_point_from_direction(light_direction);
-            // self.image
-            //     .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
-            //     .as_vec3()
-            SpectrumSample::ZERO // INCOMPLETED
+            let image_point = self.image_point_from_direction(light_direction);
+            self.image.sample_image_point(image_point, wavelength)
         }
     }
 

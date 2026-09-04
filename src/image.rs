@@ -1,5 +1,7 @@
+mod rgb_illuminant_image;
 mod rgb_image;
 
+pub use rgb_illuminant_image::RgbIlluminantImage;
 pub use rgb_image::RgbImage;
 
 pub struct Image<T> {
