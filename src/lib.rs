@@ -1,6 +1,7 @@
 pub mod accelerate;
 pub mod bsdf;
 pub mod camera;
+pub mod color;
 pub mod geometry;
 pub mod image;
 pub mod integrator;
@@ -10,6 +11,7 @@ pub mod material;
 mod parallel;
 pub mod sample;
 pub mod scene;
+pub mod spectrum;
 pub mod util;
 
 pub use parallel::THREAD_POOL;

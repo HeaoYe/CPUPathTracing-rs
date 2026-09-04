@@ -1,14 +1,18 @@
-use crate::{THREAD_POOL, image::RgbImage, util::Rgb};
+use crate::{
+    THREAD_POOL,
+    color::{ColorSpace, EncodedRgb, LinearRgb, SRGB, Xyz},
+    image::RgbImage,
+};
 
 #[derive(Default, Clone)]
 pub struct Pixel {
-    color_sum: glam::DVec3,
+    xyz_sum: glam::DVec3,
     sample_count: usize,
 }
 
-pub enum PixelSample {
+pub enum PixelSample<'a> {
     Radiance(glam::Vec3),
-    Rgb(crate::util::Rgb),
+    Rgb(EncodedRgb, &'a ColorSpace),
 }
 
 impl Pixel {
@@ -18,9 +22,13 @@ impl Pixel {
                 if radiance.is_nan() {
                     return;
                 }
-                self.color_sum += radiance.as_dvec3()
+                self.xyz_sum += SRGB.xyz_from_rgb(radiance.into()).as_dvec3();
             }
-            PixelSample::Rgb(rgb) => self.color_sum += glam::Vec3::from(rgb).as_dvec3(),
+            PixelSample::Rgb(encoded_rgb, color_space) => {
+                self.xyz_sum += color_space
+                    .xyz_from_rgb(color_space.decode(encoded_rgb))
+                    .as_dvec3()
+            }
         }
         self.sample_count += 1;
     }
@@ -29,7 +37,7 @@ impl Pixel {
         if self.sample_count == 0 {
             glam::Vec3::ZERO
         } else {
-            (self.color_sum / self.sample_count as f64).as_vec3()
+            (self.xyz_sum / self.sample_count as f64).as_vec3()
         }
     }
 }
@@ -49,24 +57,38 @@ impl Film {
         }
     }
 
-    pub fn write_rgb_buffer(&self, width: usize, height: usize, dst: &mut [u32]) {
+    pub fn write_rgb_buffer(
+        &self,
+        width: usize,
+        height: usize,
+        dst: &mut [u32],
+        color_space: &ColorSpace,
+    ) {
         debug_assert_eq!(dst.len(), width * height);
         THREAD_POOL.parallel_for_2d_coarse(width, height, dst, move |x, y, buffer| {
             let x = x * self.width / width;
             let y = y * self.height / height;
             let index = y * self.width + x;
-            let pixel = self.pixels[index].average();
-            let [r, g, b] = Rgb::from(pixel).to_array();
+            let xyz = Xyz::from(self.pixels[index].average());
+            let [r, g, b] = color_space
+                .encode(color_space.rgb_from_xyz(xyz))
+                .to_quantized(8)
+                .to_array();
             *buffer = (r as u32) << 16 | (g as u32) << 8 | b as u32;
         });
     }
 
-    pub fn save(&self, filename: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        let mut buffer = vec![glam::Vec3::ZERO; self.width * self.height];
-        THREAD_POOL.parallel_for_2d_coarse(self.width, self.height, &mut buffer, |x, y, pixel| {
-            *pixel = self.pixels[y * self.width + x].average();
+    pub fn save(
+        &self,
+        filename: impl AsRef<std::path::Path>,
+        color_space: &ColorSpace,
+    ) -> std::io::Result<()> {
+        let mut buffer = vec![LinearRgb::default(); self.width * self.height];
+        THREAD_POOL.parallel_for_1d_coarse(&mut buffer, |index, pixel| {
+            let xyz = Xyz::from(self.pixels[index].average());
+            *pixel = color_space.rgb_from_xyz(xyz);
         });
-        let image = RgbImage::new(self.width, self.height, buffer);
+        let image = RgbImage::new(self.width, self.height, buffer, color_space);
         image.save(filename)
     }
 

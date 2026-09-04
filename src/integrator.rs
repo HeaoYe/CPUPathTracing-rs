@@ -13,6 +13,7 @@ pub use simple_path_tracing_integrator::SimplePathTracingIntegrator;
 use crate::{
     THREAD_POOL,
     camera::{Camera, CameraModel, PixelSample},
+    color::ColorSpace,
     scene::Scene,
     util::{Progress, profile},
 };
@@ -25,7 +26,7 @@ pub trait Integrator {
         sample_index: usize,
         camera: &CameraModel,
         scene: &Scene,
-    ) -> Option<PixelSample>;
+    ) -> Option<PixelSample<'_>>;
 }
 
 pub fn render<T>(
@@ -34,6 +35,7 @@ pub fn render<T>(
     scene: &Scene,
     spp: usize,
     filename: impl AsRef<std::path::Path>,
+    target_color_space: &ColorSpace,
 ) -> Result<(), std::io::Error>
 where
     T: Integrator + Sync,
@@ -68,7 +70,7 @@ where
         current_spp += batch_spp;
         increase = current_spp.min(32);
 
-        film.save(filename)?;
+        film.save(filename, target_color_space)?;
         println!(
             "{} spp has been saved to {}",
             current_spp,

@@ -10,7 +10,7 @@
 两套实现的算法目标与课程进度保持对应，但具体的数据组织、抽象方式等可能不同。
 
 ## 项目状态 Status
-当前进度：**22 / 25 — 代码勘误和一些改进**
+当前进度：**23 / 25 — 光谱渲染（上）色彩科学**
 
 - [x] [Lecture01](../../tree/Lecture01) 课程介绍
 - [x] [Lecture02](../../tree/Lecture02) 线程池与胶片
@@ -34,7 +34,7 @@
 - [x] [Lecture20](../../tree/Lecture20) BVH 构建优化
 - [x] [Lecture21](../../tree/Lecture21) 环境光照
 - [x] [Lecture22](../../tree/Lecture22) 代码勘误和一些改进
-- [ ] Lecture23 光谱渲染（上）色彩科学
+- [x] [Lecture23](../../tree/Lecture23) 光谱渲染（上）色彩科学
 - [ ] Lecture24-1 光谱渲染（中）基础框架
 - [ ] Lecture24-2 光谱渲染（中）Spectral MIS
 - [ ] Lecture25 光谱渲染（下）RGB 转光谱

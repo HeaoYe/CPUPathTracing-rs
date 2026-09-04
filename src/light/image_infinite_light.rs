@@ -2,7 +2,7 @@ use super::LightSample;
 use crate::{image::RgbImage, light_sampler::MisCompensation, sample::AliasTable};
 
 pub struct ImageInfiniteLight<'a> {
-    image: &'a RgbImage,
+    image: &'a RgbImage<'a>,
     start_phi: f32,
     power: f32,
     gird_count: glam::USizeVec2,
@@ -29,7 +29,7 @@ impl<'a> ImageInfiniteLight<'a> {
         let mut girds_power = vec![0.0; gird_count.x * gird_count.y];
         for y in 0..image.height() {
             for x in 0..image.width() {
-                let pixel_power = image.get_pixel(x, y).unwrap().max_element();
+                let pixel_power = image.get_pixel(x, y).unwrap().as_vec3().max_element();
                 light.power += pixel_power;
                 let gird_index = light.gird_idx_from_image_point(glam::vec2(x as f32, y as f32));
                 girds_power[gird_index.y * gird_count.x + gird_index.x] += pixel_power;
@@ -100,9 +100,10 @@ impl<'a> ImageInfiniteLight<'a> {
             Some(LightSample {
                 light_point: surface_point + 2.0 * scene_radius * light_direction,
                 light_direction,
-                radiance: *self
+                radiance: self
                     .image
-                    .get_pixel_wrapped(image_point.x as i32, image_point.y as i32),
+                    .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+                    .as_vec3(),
                 pdf: sample.pmf * self.image.width() as f32 * self.image.height() as f32
                     / (2.0
                         * std::f32::consts::PI
@@ -119,9 +120,9 @@ impl<'a> ImageInfiniteLight<'a> {
             glam::Vec3::ZERO
         } else {
             let image_point = self.image_point_from_direction(light_direction);
-            *self
-                .image
+            self.image
                 .get_pixel_wrapped(image_point.x as i32, image_point.y as i32)
+                .as_vec3()
         }
     }
 

@@ -28,7 +28,7 @@ impl<L: LightSelector> Integrator for SimplePathTracingIntegrator<'_, L> {
         sample_index: usize,
         camera: &CameraModel,
         scene: &Scene,
-    ) -> Option<PixelSample> {
+    ) -> Option<PixelSample<'_>> {
         let mut rng = Rng::new(0, ((x + 1) * (y + 1) * sample_index) as u64);
 
         let mut ray = camera.generate_ray(

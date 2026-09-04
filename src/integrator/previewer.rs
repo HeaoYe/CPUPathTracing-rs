@@ -2,6 +2,7 @@ use super::{Integrator, NormalIntegrator};
 use crate::{
     THREAD_POOL,
     camera::{Camera, CameraController, Direction},
+    color::SRGB,
     scene::Scene,
 };
 use std::{collections::HashSet, num::NonZeroU32, sync::Arc, time::Instant};
@@ -240,6 +241,7 @@ impl<I> PreviewApp<'_, '_, I> {
             buffer.width().get() as usize,
             buffer.height().get() as usize,
             &mut buffer,
+            &SRGB,
         );
         buffer.present().unwrap();
     }
