@@ -35,6 +35,10 @@ impl LinearRgb {
     pub fn as_dvec3(&self) -> glam::DVec3 {
         self.data.as_dvec3()
     }
+
+    pub fn max_element(&self) -> f32 {
+        self.data.max_element()
+    }
 }
 
 impl From<glam::Vec3> for LinearRgb {

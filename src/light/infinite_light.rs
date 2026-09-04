@@ -40,7 +40,13 @@ impl<'a> InfiniteLight<'a> {
                 wavelength,
                 mis_compensation,
             ),
-            Self::Image(light) => light.sample(surface_point, scene_radius, rng, mis_compensation),
+            Self::Image(light) => light.sample(
+                surface_point,
+                scene_radius,
+                rng,
+                wavelength,
+                mis_compensation,
+            ),
         }
     }
 

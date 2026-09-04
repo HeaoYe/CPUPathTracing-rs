@@ -18,9 +18,7 @@ impl BlackbodySpectrum {
         let mut lambda = LAMBDA_MIN as f32 + 0.1;
         while lambda < LAMBDA_MAX as f32 {
             let value = spectrum.eval(lambda);
-            if maximum < value {
-                maximum = value;
-            }
+            maximum = maximum.max(value);
             lambda += 0.1;
         }
         spectrum.maximum = maximum;

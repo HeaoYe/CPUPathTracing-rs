@@ -23,9 +23,7 @@ impl DenselySampledSpectrum {
         let mut maximum = spectrum.eval(lambda_min as f32);
         for (i, value) in values.iter_mut().enumerate() {
             *value = spectrum.eval(lambda_min as f32 + i as f32);
-            if maximum < *value {
-                maximum = *value;
-            }
+            maximum = maximum.max(*value);
         }
         Self {
             lambda_min,

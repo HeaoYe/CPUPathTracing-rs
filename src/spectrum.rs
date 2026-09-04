@@ -6,6 +6,8 @@ mod densely_sampled_spectrum;
 mod illuminant;
 mod illuminant_spectrum;
 mod piecewise_linear_spectrum;
+mod rgb_illuminant_spectrum;
+mod sigmoid_polynomial_spectrum;
 mod spectrum_sample;
 mod wavelength;
 
@@ -19,8 +21,12 @@ pub use illuminant::{
 };
 pub use illuminant_spectrum::IlluminantSpectrum;
 pub use piecewise_linear_spectrum::{PiecewiseLinearSpectrum, SamplePoint};
+pub use rgb_illuminant_spectrum::RgbIlluminantSpectrum;
+pub use sigmoid_polynomial_spectrum::SigmoidPolynomialSpectrum;
 pub use spectrum_sample::SpectrumSample;
 pub use wavelength::{LAMBDA_MAX, LAMBDA_MIN, WAVELENGTH_SAMPLE_COUNT, WavelengthSample};
+
+use crate::color::{ColorLut, EncodedRgb, LinearRgb};
 
 pub enum Spectrum<'a> {
     Default,
@@ -28,8 +34,10 @@ pub enum Spectrum<'a> {
     Dense(DenselySampledSpectrum),
     PiecewiseLinear(PiecewiseLinearSpectrum),
     Blackbody(BlackbodySpectrum),
-    Analytic(AnalyticSpectrum),
+    Analytic(AnalyticSpectrum<'a>),
     Illuminant(IlluminantSpectrum<'a>),
+    Sigmoid(SigmoidPolynomialSpectrum),
+    RgbIllumnt(Box<RgbIlluminantSpectrum<'a>>),
 }
 
 impl Spectrum<'_> {
@@ -53,6 +61,8 @@ impl Spectrum<'_> {
                 Self::Blackbody(spectrum) => spectrum.eval(lambda),
                 Self::Analytic(spectrum) => spectrum.eval(lambda),
                 Self::Illuminant(spectrum) => spectrum.eval(lambda),
+                Self::Sigmoid(spectrum) => spectrum.eval(lambda),
+                Self::RgbIllumnt(spectrum) => spectrum.eval(lambda),
             }
         }
     }
@@ -66,6 +76,8 @@ impl Spectrum<'_> {
             Self::Blackbody(spectrum) => spectrum.max(),
             Self::Analytic(spectrum) => spectrum.max(),
             Self::Illuminant(spectrum) => spectrum.max(),
+            Self::Sigmoid(spectrum) => spectrum.max(),
+            Self::RgbIllumnt(spectrum) => spectrum.max(),
         }
     }
 }
@@ -190,7 +202,7 @@ impl<'a> Spectrum<'a> {
     }
 
     pub fn analytic(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         lambda_min: f32,
         lambda_max: f32,
     ) -> Self {
@@ -198,7 +210,7 @@ impl<'a> Spectrum<'a> {
     }
 
     pub fn analytic_with_maximum(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         maximum: f32,
         lambda_min: f32,
         lambda_max: f32,
@@ -221,5 +233,24 @@ impl<'a> Spectrum<'a> {
         Self::Illuminant(IlluminantSpectrum::new(
             illuminant, luminance, lambda_min, lambda_max,
         ))
+    }
+
+    pub fn sigmoid(c0: f32, c1: f32, c2: f32) -> Self {
+        Self::Sigmoid(SigmoidPolynomialSpectrum::new(c0, c1, c2))
+    }
+
+    pub fn rgb_illuminant_rgb8(color_lut: &'a ColorLut<'a>, r: u8, g: u8, b: u8) -> Self {
+        Self::rgb_illuminant_encoded(
+            color_lut,
+            EncodedRgb::from_quantized(r as u32, g as u32, b as u32, 8),
+        )
+    }
+
+    pub fn rgb_illuminant_encoded(color_lut: &'a ColorLut<'a>, encoded_rgb: EncodedRgb) -> Self {
+        Self::rgb_illuminant_linear_rgb(color_lut, color_lut.color_space().decode(encoded_rgb))
+    }
+
+    pub fn rgb_illuminant_linear_rgb(color_lut: &'a ColorLut<'a>, linear_rgb: LinearRgb) -> Self {
+        Self::RgbIllumnt(Box::new(RgbIlluminantSpectrum::new(color_lut, linear_rgb)))
     }
 }
