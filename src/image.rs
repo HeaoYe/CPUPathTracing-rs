@@ -33,6 +33,12 @@ impl<T> Image<T> {
         self.pixels.get(y * self.width + x)
     }
 
+    pub fn get_pixel_wrapped(&self, x: i32, y: i32) -> &T {
+        let x = x.clamp(0, self.width as i32 - 1) as usize;
+        let y = y.clamp(0, self.height as i32 - 1) as usize;
+        &self.pixels[y * self.width + x]
+    }
+
     pub fn as_slice_mut(&mut self) -> &mut [T] {
         &mut self.pixels
     }

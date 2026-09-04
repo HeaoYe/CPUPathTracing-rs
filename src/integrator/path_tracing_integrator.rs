@@ -50,8 +50,9 @@ impl<L: LightSelector> Integrator for PathTracingIntegrator<'_, L> {
                 area_light,
             }) = scene.intersect(&ray, 1e-3, f32::INFINITY)
             else {
+                let light_direction = ray.direction.normalize();
                 if last_is_delta {
-                    radiance += beta * scene.infinite_radiance(ray.direction);
+                    radiance += beta * scene.infinite_radiance(light_direction);
                 } else {
                     let light_point = ray.origin + 2.0 * scene.radius() * ray.direction;
                     for (id, light) in scene.infinite_lights() {
@@ -59,7 +60,7 @@ impl<L: LightSelector> Integrator for PathTracingIntegrator<'_, L> {
                             self.light_sampler
                                 .pdf(id, ray.origin, light_point, -ray.direction);
                         let weight_bsdf = power_heuristic(last_pdf_bsdf, pdf_light);
-                        radiance += weight_bsdf * beta * light.radiance();
+                        radiance += weight_bsdf * beta * light.radiance(light_direction);
                     }
                 }
                 break;

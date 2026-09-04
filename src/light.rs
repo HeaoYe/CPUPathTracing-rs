@@ -1,8 +1,10 @@
 mod area_light;
+mod image_infinite_light;
 mod infinite_light;
 mod uniform_infinite_light;
 
 pub use area_light::AreaLight;
+pub use image_infinite_light::ImageInfiniteLight;
 pub use infinite_light::InfiniteLight;
 pub use uniform_infinite_light::UniformInfiniteLight;
 
@@ -13,7 +15,7 @@ pub struct LightSample {
     pub pdf: f32,
 }
 
-pub enum Light {
+pub enum Light<'a> {
     Area(AreaLight),
-    Infinite(InfiniteLight),
+    Infinite(InfiniteLight<'a>),
 }

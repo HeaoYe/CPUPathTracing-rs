@@ -87,7 +87,10 @@ impl<L: LightSelector> LightSampler<'_, L> {
                     .unwrap();
                 light.pdf(shape_instance.shape(), surface_point, light_point, normal)
             }
-            Light::Infinite(light) => light.pdf(self.mis_compensation),
+            Light::Infinite(light) => light.pdf(
+                (light_point - surface_point).normalize(),
+                self.mis_compensation,
+            ),
         };
         self.light_selector.pmf(light_id) * pdf
     }

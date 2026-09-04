@@ -1,7 +1,8 @@
 use crate::{
     accelerate::{Bounds, Bvh},
     geometry::{Bounded, Centroid, Intersection, Ray, Shape},
-    light::{AreaLight, InfiniteLight, Light, UniformInfiniteLight},
+    image::RgbImage,
+    light::{AreaLight, ImageInfiniteLight, InfiniteLight, Light, UniformInfiniteLight},
     material::Material,
 };
 
@@ -98,12 +99,12 @@ impl Centroid for ShapeInstance<'_> {
 #[derive(Default)]
 pub struct SceneBuilder<'a> {
     instances: Vec<ShapeInstance<'a>>,
-    lights: Vec<Light>,
+    lights: Vec<Light<'a>>,
 }
 
 pub struct Scene<'a> {
     bvh: Bvh<ShapeInstance<'a>>,
-    lights: Vec<Light>,
+    lights: Vec<Light<'a>>,
     radius: f32,
 }
 
@@ -147,6 +148,13 @@ impl<'a> SceneBuilder<'a> {
         self.lights.push(Light::Infinite(InfiniteLight::Uniform(
             UniformInfiniteLight::new(radiance.into()),
         )));
+    }
+
+    pub fn add_image_infinite_light(&mut self, image: &'a RgbImage, start_phi: f32) {
+        self.lights
+            .push(Light::Infinite(InfiniteLight::Image(Box::new(
+                ImageInfiniteLight::new(image, start_phi),
+            ))));
     }
 
     pub fn build(mut self) -> Scene<'a> {
@@ -222,14 +230,14 @@ impl Scene<'_> {
         self.lights.len()
     }
 
-    pub(crate) fn lights(&self) -> impl Iterator<Item = (LightId, &Light)> {
+    pub(crate) fn lights(&self) -> impl Iterator<Item = (LightId, &Light<'_>)> {
         self.lights
             .iter()
             .enumerate()
             .map(|(index, light)| (LightId(index), light))
     }
 
-    pub(crate) fn infinite_lights(&self) -> impl Iterator<Item = (LightId, &InfiniteLight)> {
+    pub(crate) fn infinite_lights(&self) -> impl Iterator<Item = (LightId, &InfiniteLight<'_>)> {
         self.lights
             .iter()
             .enumerate()
@@ -239,11 +247,11 @@ impl Scene<'_> {
             })
     }
 
-    pub(crate) fn infinite_radiance(&self, _light_direction: glam::Vec3) -> glam::Vec3 {
+    pub(crate) fn infinite_radiance(&self, light_direction: glam::Vec3) -> glam::Vec3 {
         self.lights
             .iter()
             .filter_map(|light| match light {
-                Light::Infinite(light) => Some(light.radiance()),
+                Light::Infinite(light) => Some(light.radiance(light_direction)),
                 Light::Area(_) => None,
             })
             .sum()
@@ -257,7 +265,7 @@ impl Scene<'_> {
         self.bvh.get_primitive(id.0)
     }
 
-    pub(crate) fn get_light(&self, id: LightId) -> Option<&Light> {
+    pub(crate) fn get_light(&self, id: LightId) -> Option<&Light<'_>> {
         self.lights.get(id.0)
     }
 
