@@ -6,6 +6,7 @@ mod densely_sampled_spectrum;
 mod illuminant;
 mod illuminant_spectrum;
 mod piecewise_linear_spectrum;
+mod sigmoid_polynomial_spectrum;
 mod spectrum_sample;
 mod wavelength;
 
@@ -19,6 +20,7 @@ pub use illuminant::{
 };
 pub use illuminant_spectrum::IlluminantSpectrum;
 pub use piecewise_linear_spectrum::{PiecewiseLinearSpectrum, SamplePoint};
+pub use sigmoid_polynomial_spectrum::SigmoidPolynomialSpectrum;
 pub use spectrum_sample::SpectrumSample;
 pub use wavelength::{LAMBDA_MAX, LAMBDA_MIN, WAVELENGTH_SAMPLE_COUNT, WavelengthSample};
 
@@ -28,8 +30,9 @@ pub enum Spectrum<'a> {
     Dense(DenselySampledSpectrum),
     PiecewiseLinear(PiecewiseLinearSpectrum),
     Blackbody(BlackbodySpectrum),
-    Analytic(AnalyticSpectrum),
+    Analytic(AnalyticSpectrum<'a>),
     Illuminant(IlluminantSpectrum<'a>),
+    Sigmoid(SigmoidPolynomialSpectrum),
 }
 
 impl Spectrum<'_> {
@@ -53,6 +56,7 @@ impl Spectrum<'_> {
                 Self::Blackbody(spectrum) => spectrum.eval(lambda),
                 Self::Analytic(spectrum) => spectrum.eval(lambda),
                 Self::Illuminant(spectrum) => spectrum.eval(lambda),
+                Self::Sigmoid(spectrum) => spectrum.eval(lambda),
             }
         }
     }
@@ -66,6 +70,7 @@ impl Spectrum<'_> {
             Self::Blackbody(spectrum) => spectrum.max(),
             Self::Analytic(spectrum) => spectrum.max(),
             Self::Illuminant(spectrum) => spectrum.max(),
+            Self::Sigmoid(spectrum) => spectrum.max(),
         }
     }
 }
@@ -190,7 +195,7 @@ impl<'a> Spectrum<'a> {
     }
 
     pub fn analytic(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         lambda_min: f32,
         lambda_max: f32,
     ) -> Self {
@@ -198,7 +203,7 @@ impl<'a> Spectrum<'a> {
     }
 
     pub fn analytic_with_maximum(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         maximum: f32,
         lambda_min: f32,
         lambda_max: f32,
@@ -221,5 +226,9 @@ impl<'a> Spectrum<'a> {
         Self::Illuminant(IlluminantSpectrum::new(
             illuminant, luminance, lambda_min, lambda_max,
         ))
+    }
+
+    pub fn sigmoid(c0: f32, c1: f32, c2: f32) -> Self {
+        Self::Sigmoid(SigmoidPolynomialSpectrum::new(c0, c1, c2))
     }
 }

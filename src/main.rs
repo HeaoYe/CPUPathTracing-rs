@@ -31,6 +31,9 @@ fn rgb_spectrum<'a>(r: u8, g: u8, b: u8) -> spectrum::Spectrum<'a> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    color::test_optimize();
+    return Ok(());
+
     let film = camera::Film::new(192 * 10, 108 * 10);
     let mut camera = camera::Camera::new(
         film,

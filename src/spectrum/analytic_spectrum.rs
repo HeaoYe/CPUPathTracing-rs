@@ -1,15 +1,15 @@
-type Expression = Box<dyn Fn(f32) -> f32 + Send + Sync>;
+type Expression<'a> = Box<dyn Fn(f32) -> f32 + Send + Sync + 'a>;
 
-pub struct AnalyticSpectrum {
+pub struct AnalyticSpectrum<'a> {
     lambda_min: f32,
     lambda_max: f32,
     maximum: f32,
-    expression: Expression,
+    expression: Expression<'a>,
 }
 
-impl AnalyticSpectrum {
+impl<'a> AnalyticSpectrum<'a> {
     pub(super) fn new(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         lambda_min: f32,
         lambda_max: f32,
     ) -> Self {
@@ -34,7 +34,7 @@ impl AnalyticSpectrum {
     }
 
     pub(super) fn with_maximum(
-        expression: impl Fn(f32) -> f32 + Send + Sync + 'static,
+        expression: impl Fn(f32) -> f32 + Send + Sync + 'a,
         maximum: f32,
         lambda_min: f32,
         lambda_max: f32,
