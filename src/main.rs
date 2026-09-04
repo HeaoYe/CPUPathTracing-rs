@@ -1,4 +1,4 @@
-use cpu_path_tracing::{camera, geometry, integrator, light_sampler, material, scene, util};
+use cpu_path_tracing::{camera, geometry, image, integrator, light_sampler, material, scene, util};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let film = camera::Film::new(192 * 10, 108 * 10);
@@ -75,7 +75,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     );
 
-    builder.add_uniform_infinite_light([0.5, 0.5, 0.5]);
+    // builder.add_uniform_infinite_light([0.5, 0.5, 0.5]);
+    // let env_image =
+    //     image::RgbImage::load_exr("hdris/HdrOutdoorSnowMountainsEveningClear001_HDR_4K.exr")?;
+    // let env_image = image::RgbImage::load_exr("hdris/qwantani_night_puresky_4k.exr")?;
+    let env_image = image::RgbImage::load_exr("hdris/kloppenheim_07_puresky_4k.exr")?;
+    builder.add_image_infinite_light(&env_image, 0.0);
 
     let scene = builder.build();
 
@@ -96,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut camera,
             &scene,
             64,
-            "PT_MIS.ppm",
+            "PT_MIS.exr",
         )?;
     }
 
