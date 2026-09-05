@@ -1,7 +1,6 @@
 use cpu_path_tracing::{
-    camera,
-    color::{self, LinearRgb},
-    geometry, image, integrator, light_sampler, material, sample, scene, spectrum, util,
+    camera, color, geometry, image, integrator, light_sampler, material, sample, scene, spectrum,
+    util,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -180,7 +179,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     const DRAGON_COUNT: usize = 1200;
     let mut rng = util::Rng::new(DRAGON_COUNT as u64, 0);
     let reflectance_spectral: Vec<_> = std::iter::repeat_with(|| {
-        color::LUT_SRGB.lookup_linear(LinearRgb::new(rng.uniform(), rng.uniform(), rng.uniform()))
+        color::LUT_SRGB.lookup_linear(color::LinearRgb::new(
+            rng.uniform(),
+            rng.uniform(),
+            rng.uniform(),
+        ))
     })
     .take(DRAGON_COUNT)
     .collect();
