@@ -1,5 +1,5 @@
 use crate::{
-    accelerate::{Bounds, Bvh},
+    accelerate::{Bounds, Bvh, BvhLevel},
     geometry::{Bounded, Centroid, Intersection, Ray, Shape},
     image::RgbImage,
     light::{AreaLight, ImageInfiniteLight, InfiniteLight, Light, UniformInfiniteLight},
@@ -163,7 +163,7 @@ impl<'a> SceneBuilder<'a> {
     }
 
     pub fn build(mut self) -> Scene<'a> {
-        let mut bvh = Bvh::new(self.instances);
+        let mut bvh = Bvh::new(self.instances, BvhLevel::Top);
         for (instance_index, instance) in bvh.ordered_primitives_mut().iter().enumerate() {
             if let Some(LightId(index)) = instance.area_light_id
                 && let Light::Area(area_light) = self.lights.get_mut(index).unwrap()
