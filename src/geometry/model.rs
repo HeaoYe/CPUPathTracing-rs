@@ -1,6 +1,6 @@
 use super::{Bounded, Intersection, Ray, Sampleable, Shape, SurfaceSample, Triangle};
 use crate::{
-    accelerate::{Bounds, Bvh},
+    accelerate::{Bounds, Bvh, BvhLevel},
     util::{Rng, parse_obj, profile},
 };
 
@@ -36,7 +36,7 @@ impl Model {
             }
         }
 
-        let mut bvh = Bvh::new(triangles);
+        let mut bvh = Bvh::new(triangles, BvhLevel::Bottom);
         bvh.build_alias_table();
         Ok(Model { bvh })
     }

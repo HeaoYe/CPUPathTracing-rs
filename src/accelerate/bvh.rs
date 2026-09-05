@@ -78,11 +78,17 @@ impl<P: Bounded> Bvh<P> {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum BvhLevel {
+    Bottom,
+    Top,
+}
+
 impl<P> Bvh<P>
 where
     P: Bounded + Centroid + Send,
 {
-    pub fn new(primitives: Vec<P>) -> Self {
+    pub fn new(primitives: Vec<P>, level: BvhLevel) -> Self {
         let mut bvh = Self {
             flattened_nodes: Vec::new(),
             ordered_primitives: primitives,
@@ -105,7 +111,7 @@ where
 
         // SAFETY: 使用 THREAD_POOL.wait() 确保多线程构建时的参数有效。
         unsafe {
-            Bvh::recursive_split(&mut root, &mut bvh.ordered_primitives, &state);
+            Bvh::recursive_split(&mut root, &mut bvh.ordered_primitives, &state, level);
         }
         THREAD_POOL.wait();
 
@@ -159,14 +165,23 @@ impl Bucket {
 
 impl<P: Bounded + Centroid + Send> Bvh<P> {
     // SAFETY: 调用者必须使用 THREAD_POOL.wait() 确保多线程构建使用的参数有效。
-    unsafe fn recursive_split(node: &mut BvhTreeNode, primitive_slice: &mut [P], state: &BvhState) {
+    unsafe fn recursive_split(
+        node: &mut BvhTreeNode,
+        primitive_slice: &mut [P],
+        state: &BvhState,
+        level: BvhLevel,
+    ) {
         state.total_node_count.fetch_add(1, Ordering::Relaxed);
 
         let BvhTreeNode::Leaf(leaf) = node else {
             panic!()
         };
 
-        if primitive_slice.len() <= 4 || leaf.depth == 32 {
+        let max_leaf_primitive_count = match level {
+            BvhLevel::Top => 1,
+            BvhLevel::Bottom => 4,
+        };
+        if primitive_slice.len() <= max_leaf_primitive_count || leaf.depth == 32 {
             return;
         }
 
@@ -234,7 +249,9 @@ impl<P: Bounded + Centroid + Send> Bvh<P> {
             return;
         }
 
-        if 0.5 + min_split.cost / leaf.bounds.area() >= primitive_slice.len() as f32 {
+        if matches!(level, BvhLevel::Bottom)
+            && 0.5 + min_split.cost / leaf.bounds.area() >= primitive_slice.len() as f32
+        {
             return;
         }
 
@@ -303,16 +320,16 @@ impl<P: Bounded + Centroid + Send> Bvh<P> {
         if primitive_count > 128 * 1024 {
             unsafe {
                 THREAD_POOL.add_scope_task_unchecked(Box::new(move || {
-                    Bvh::recursive_split(left_node, sub_primitive_slice.0, state);
+                    Bvh::recursive_split(left_node, sub_primitive_slice.0, state, level);
                 }));
                 THREAD_POOL.add_scope_task_unchecked(Box::new(move || {
-                    Bvh::recursive_split(right_node, sub_primitive_slice.1, state);
+                    Bvh::recursive_split(right_node, sub_primitive_slice.1, state, level);
                 }));
             }
         } else {
             unsafe {
-                Bvh::recursive_split(&mut interior.left, sub_primitive_slice.0, state);
-                Bvh::recursive_split(&mut interior.right, sub_primitive_slice.1, state);
+                Bvh::recursive_split(&mut interior.left, sub_primitive_slice.0, state, level);
+                Bvh::recursive_split(&mut interior.right, sub_primitive_slice.1, state, level);
             }
         }
     }
