@@ -164,12 +164,7 @@ impl<'a> ImageInfiniteLight<'a> {
     fn image_point_from_direction(&self, direction: glam::Vec3) -> glam::Vec2 {
         let direction = direction.normalize();
         let theta = direction.y.clamp(-1.0, 1.0).acos().to_degrees();
-        let phi = direction
-            .z
-            .atan2(direction.x)
-            .to_degrees()
-            .rem_euclid(360.0)
-            + self.start_phi;
+        let phi = (direction.z.atan2(direction.x).to_degrees() + self.start_phi).rem_euclid(360.0);
         glam::vec2(
             self.image.width() as f32 * (phi / 360.0),
             self.image.height() as f32 * (theta / 180.0),
